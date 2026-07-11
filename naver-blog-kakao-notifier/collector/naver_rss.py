@@ -38,8 +38,11 @@ def _fetch_content(blog_id: str, log_no: str) -> str:
     return content_el.get_text(separator="\n", strip=True)
 
 
-def fetch_new_posts(blog_id: str) -> list[dict]:
-    """RSS에서 신규 글을 조회하고, 중복 필터링 후 DB에 status='collected'로 저장한다."""
+def fetch_new_posts(blog_id: str, fetch_content: bool = True) -> list[dict]:
+    """RSS에서 신규 글을 조회하고, 중복 필터링 후 DB에 status='collected'로 저장한다.
+
+    fetch_content=False면 본문 상세 페이지 요청을 건너뛴다 (기준선/백로그 처리용).
+    """
     feed = feedparser.parse(RSS_URL_TEMPLATE.format(blog_id=blog_id), request_headers=HEADERS)
     new_posts = []
 
@@ -58,7 +61,7 @@ def fetch_new_posts(blog_id: str) -> list[dict]:
             "title": entry.title,
             "url": entry.link,
             "published_at": _to_iso8601(entry.get("published_parsed")),
-            "raw_content": _fetch_content(blog_id, log_no),
+            "raw_content": _fetch_content(blog_id, log_no) if fetch_content else "",
         }
         insert_post(post)
         new_posts.append(post)
