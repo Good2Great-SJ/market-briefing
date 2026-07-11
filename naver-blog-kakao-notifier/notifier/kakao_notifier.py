@@ -38,6 +38,12 @@ def _load_source_map() -> dict:
     return source_map
 
 
+def _format_summary(summary: str) -> str:
+    """불릿 포인트 사이에 빈 줄을 넣어 카카오톡에서 가독성 있게 표시한다."""
+    lines = [line.strip() for line in summary.split("\n") if line.strip()]
+    return "\n\n".join(lines)
+
+
 def _build_template(post: dict) -> dict:
     source = _load_source_map().get(post["blog_id"], {"name": post["blog_id"], "type": "blog"})
     label = "새로운 영상" if source["type"] == "youtube" else "새로운 글"
@@ -49,7 +55,7 @@ def _build_template(post: dict) -> dict:
         source_name=source["name"],
         label=label,
         title=post["title"],
-        summary=post.get("summary", ""),
+        summary=_format_summary(post.get("summary", "")),
         keywords_line=keywords_line,
         url=post["url"],
     )
