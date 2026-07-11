@@ -1,0 +1,19 @@
+watch_mode: rss   # rss | search_api
+
+blogs:
+  - blog_id: "example_blog_id"
+
+search_api:
+  keywords:
+    - "예시 키워드"
+  display: 10       # 한 번에 가져올 글 수
+
+schedule:
+  interval_minutes: 60
+
+summarizer:
+  max_content_length: 3000   # 요약 전 truncate 기준 (자)
+  model: "claude-sonnet-5"
+
+notification:
+  method: kakao_memo   # kakao_memo | alimtalk (추후 확장)
