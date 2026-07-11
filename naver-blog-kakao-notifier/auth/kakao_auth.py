@@ -8,9 +8,14 @@ from db.db import get_kakao_tokens, save_kakao_tokens
 
 load_dotenv()
 
-KAKAO_REST_API_KEY = os.environ.get("KAKAO_REST_API_KEY")
-KAKAO_REDIRECT_URI = os.environ.get("KAKAO_REDIRECT_URI", "http://localhost:5000/oauth/callback")
-KAKAO_CLIENT_SECRET = os.environ.get("KAKAO_CLIENT_SECRET")
+def _clean_env(name: str, default: str = "") -> str:
+    """환경변수(특히 GitHub Secrets)에 섞여 들어올 수 있는 앞뒤 공백/개행문자를 제거한다."""
+    return os.environ.get(name, default).strip()
+
+
+KAKAO_REST_API_KEY = _clean_env("KAKAO_REST_API_KEY")
+KAKAO_REDIRECT_URI = _clean_env("KAKAO_REDIRECT_URI", "http://localhost:5000/oauth/callback")
+KAKAO_CLIENT_SECRET = _clean_env("KAKAO_CLIENT_SECRET")
 
 AUTHORIZE_URL = "https://kauth.kakao.com/oauth/authorize"
 TOKEN_URL = "https://kauth.kakao.com/oauth/token"
@@ -91,7 +96,7 @@ def ensure_session():
     if get_kakao_tokens():
         return
 
-    env_refresh_token = os.environ.get("KAKAO_REFRESH_TOKEN")
+    env_refresh_token = _clean_env("KAKAO_REFRESH_TOKEN")
     if not env_refresh_token:
         raise RuntimeError(
             "카카오 토큰이 없습니다. auth/kakao_auth.py로 먼저 인증하거나, "

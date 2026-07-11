@@ -48,7 +48,7 @@ def _call_claude(client: Anthropic, model: str, raw_content: str, max_content_le
 def summarize(post: dict) -> dict:
     """post['raw_content']를 Claude API로 요약하고, 결과를 DB에 저장한다."""
     cfg = _load_summarizer_config()
-    client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+    client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"].strip())
 
     result = None
     last_error = None
