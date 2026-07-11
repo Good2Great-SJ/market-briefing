@@ -39,6 +39,9 @@ def fetch_new_videos(channel_id: str, fetch_transcript: bool = True) -> list[dic
         if not video_id:
             continue
 
+        if "/shorts/" in entry.link:
+            continue
+
         post_id = f"{channel_id}_{video_id}"
         if post_exists(post_id):
             continue
