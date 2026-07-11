@@ -18,7 +18,7 @@ CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 
 # 카카오톡 "나에게 보내기" text 템플릿은 약 1000자에서 잘리는 것이 실측으로 확인됨.
 # 링크(URL)는 항상 끝까지 보여야 하므로, 넘칠 경우 요약을 불릿 단위로 잘라 안전 마진을 둔다.
-MAX_TEXT_LENGTH = 950
+MAX_TEXT_LENGTH = 910
 
 MESSAGE_TEMPLATE = """\
 🆕 [{source_name}] {label} 알림
