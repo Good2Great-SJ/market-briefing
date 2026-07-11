@@ -27,7 +27,7 @@ schedule:
   interval_minutes: 60
 
 summarizer:
-  max_content_length: 3000   # 요약 전 truncate 기준 (자)
+  max_content_length: 6000   # 요약 전 truncate 기준 (자)
   model: "claude-sonnet-5"
 
 notification:

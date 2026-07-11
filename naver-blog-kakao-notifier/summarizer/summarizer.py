@@ -11,10 +11,11 @@ load_dotenv()
 
 PROMPT_TEMPLATE = """\
 다음 글을 한국어로 요약하고, 핵심 키워드 3개를 뽑아줘.
-요약은 카카오톡 메시지로 발송될 것이므로 가독성이 중요해:
-- 2~4개의 핵심 포인트로 나눠서 각각 "• "로 시작하는 한두 문장으로 작성
+요약은 카카오톡 메시지로 발송되며 총 글자 수 제한이 있으므로, 아래 분량을 반드시 지켜줘:
+- 3~5개의 핵심 포인트로 나눠서 각각 "• "로 시작
+- 각 포인트는 1~2문장으로, 핵심 내용과 근거를 압축적으로 전달 (군더더기 표현 생략)
 - 포인트 사이는 줄바꿈(\\n)으로 구분
-- 각 포인트는 핵심 내용과 맥락이 충분히 전달되도록 하되, 불필요하게 늘리지는 마
+- summary 전체는 공백 포함 500자를 넘지 않도록 작성
 
 반드시 아래 JSON 형식으로만 응답 (summary 안의 줄바꿈은 \\n으로 이스케이프):
 {{
@@ -38,7 +39,7 @@ def _call_claude(client: Anthropic, model: str, raw_content: str, max_content_le
     truncated = raw_content[:max_content_length]
     message = client.messages.create(
         model=model,
-        max_tokens=1024,
+        max_tokens=2048,
         messages=[{"role": "user", "content": PROMPT_TEMPLATE.format(raw_content=truncated)}],
     )
     text_block = next(block for block in message.content if block.type == "text")

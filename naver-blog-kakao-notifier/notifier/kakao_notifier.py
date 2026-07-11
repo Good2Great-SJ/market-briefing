@@ -1,6 +1,8 @@
 import json
 import os
+import re
 from datetime import datetime, timezone
+from typing import Callable
 
 import requests
 import yaml
@@ -13,6 +15,10 @@ load_dotenv()
 
 SEND_URL = "https://kapi.kakao.com/v2/api/talk/memo/default/send"
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.yaml")
+
+# 카카오톡 "나에게 보내기" text 템플릿은 약 1000자에서 잘리는 것이 실측으로 확인됨.
+# 링크(URL)는 항상 끝까지 보여야 하므로, 넘칠 경우 요약을 불릿 단위로 잘라 안전 마진을 둔다.
+MAX_TEXT_LENGTH = 950
 
 MESSAGE_TEMPLATE = """\
 🆕 [{source_name}] {label} 알림
@@ -39,10 +45,46 @@ def _load_source_map() -> dict:
     return source_map
 
 
-def _format_summary(summary: str) -> str:
-    """불릿 포인트 사이에 빈 줄을 넣어 카카오톡에서 가독성 있게 표시한다."""
-    lines = [line.strip() for line in summary.split("\n") if line.strip()]
-    return "\n\n".join(lines)
+def _split_bullets(summary: str) -> list[str]:
+    return [line.strip() for line in summary.split("\n") if line.strip()]
+
+
+def _truncate_to_sentence(bullet: str, budget: int) -> str:
+    """불릿 하나조차 예산을 초과하는 극단적인 경우, 문장 경계에서 잘라낸다."""
+    if len(bullet) <= budget:
+        return bullet
+
+    sentences = re.split(r"(?<=[.!?])\s+", bullet)
+    included = ""
+    for sentence in sentences:
+        candidate = f"{included} {sentence}".strip() if included else sentence
+        if len(candidate) > budget:
+            break
+        included = candidate
+
+    if included:
+        return included
+    # 문장 경계도 못 찾으면 어절 단위로 잘라 말줄임표를 붙인다.
+    return bullet[: max(budget - 1, 0)].rsplit(" ", 1)[0] + "…"
+
+
+def _fit_summary(bullets: list[str], build_text: Callable[[str], str]) -> str:
+    """전체 메시지가 MAX_TEXT_LENGTH를 넘지 않는 선에서, 완전한 불릿 단위로만 요약을 구성한다."""
+    included: list[str] = []
+    for bullet in bullets:
+        candidate_summary = "\n\n".join([*included, bullet])
+        if len(build_text(candidate_summary)) <= MAX_TEXT_LENGTH:
+            included.append(bullet)
+        else:
+            break
+
+    if included:
+        return "\n\n".join(included)
+
+    # 첫 불릿 하나조차 안 들어가는 경우: 그 불릿을 문장 단위로 잘라낸다.
+    overhead = len(build_text(""))
+    budget = max(MAX_TEXT_LENGTH - overhead, 0)
+    return _truncate_to_sentence(bullets[0], budget) if bullets else ""
 
 
 def _build_template(post: dict) -> dict:
@@ -52,14 +94,20 @@ def _build_template(post: dict) -> dict:
     keywords = [k.strip() for k in post.get("keywords", "").split(",") if k.strip()]
     keywords_line = " ".join(f"#{k}" for k in keywords) if keywords else ""
 
-    text = MESSAGE_TEMPLATE.format(
-        source_name=source["name"],
-        label=label,
-        title=post["title"],
-        summary=_format_summary(post.get("summary", "")),
-        keywords_line=keywords_line,
-        url=post["url"],
-    )
+    def build_text(summary: str) -> str:
+        return MESSAGE_TEMPLATE.format(
+            source_name=source["name"],
+            label=label,
+            title=post["title"],
+            summary=summary,
+            keywords_line=keywords_line,
+            url=post["url"],
+        )
+
+    bullets = _split_bullets(post.get("summary", ""))
+    fitted_summary = _fit_summary(bullets, build_text)
+    text = build_text(fitted_summary)
+
     return {
         "object_type": "text",
         "text": text,
