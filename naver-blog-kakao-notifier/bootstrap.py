@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import yaml
 
 from collector.naver_rss import fetch_new_posts
+from collector.youtube_rss import fetch_new_videos
 from db.db import init_db, update_post_status
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -32,6 +33,16 @@ def bootstrap():
             )
         print(f"{blog_id}: {len(new_posts)}건 기준선 처리")
         total += len(new_posts)
+
+    for channel in cfg.get("youtube_channels") or []:
+        channel_id = channel["channel_id"]
+        new_videos = fetch_new_videos(channel_id, fetch_transcript=False)
+        for video in new_videos:
+            update_post_status(
+                video["post_id"], "notified", notified_at=now, summary="(기준선 설정 - 요약 생략)"
+            )
+        print(f"{channel_id}: {len(new_videos)}건 기준선 처리")
+        total += len(new_videos)
 
     print(f"기준선 설정 완료, 총 {total}건")
 

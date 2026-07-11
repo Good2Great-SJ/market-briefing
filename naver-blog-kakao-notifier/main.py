@@ -6,6 +6,7 @@ import yaml
 
 from auth.kakao_auth import ensure_session
 from collector.naver_rss import fetch_new_posts
+from collector.youtube_rss import fetch_new_videos
 from db.db import get_posts_by_status, init_db
 from notifier.kakao_notifier import send_notification
 from summarizer.summarizer import summarize
@@ -49,6 +50,7 @@ def run_pipeline():
 
     cfg = _load_config()
     blogs = cfg.get("blogs") or []
+    youtube_channels = cfg.get("youtube_channels") or []
 
     collected_count = 0
     summarized_count = 0
@@ -64,6 +66,16 @@ def run_pipeline():
         except Exception:
             error_count += 1
             logger.exception(f"[수집 실패] {blog_id}")
+
+    for channel in youtube_channels:
+        channel_id = channel["channel_id"]
+        try:
+            new_videos = fetch_new_videos(channel_id)
+            collected_count += len(new_videos)
+            logger.info(f"[수집] {channel_id}: 신규 {len(new_videos)}건")
+        except Exception:
+            error_count += 1
+            logger.exception(f"[수집 실패] {channel_id}")
 
     for post in get_posts_by_status("collected"):
         try:

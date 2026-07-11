@@ -30,3 +30,20 @@ summarizer:
 
 notification:
   method: kakao_memo   # kakao_memo | alimtalk (추후 확장)
+
+youtube_channels:
+  - channel_id: "UCdOjVxkj5JA0iDu3_xcsTyQ"
+    name: "증시각도기"
+    handle: "koreanstockrider"
+  - channel_id: "UCl7_Zg4RdQbHx0kXaiKL-5g"
+    name: "채국장의 머니버스"
+    handle: "chaegookjang"
+  - channel_id: "UCxvdCnvGODDyuvnELnLkQWw"
+    name: "이효석아카데미"
+    handle: "hs_academy"
+  - channel_id: "UCIUni4ScRp4mqPXsxy62L5w"
+    name: "Understanding"
+    handle: "understanding."
+  - channel_id: "UCupslRq5jW95UGzPjOZz0FA"
+    name: "와이스트릿"
+    handle: "Ystreet"
