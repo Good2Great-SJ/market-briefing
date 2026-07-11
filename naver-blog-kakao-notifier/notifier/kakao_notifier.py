@@ -15,35 +15,42 @@ SEND_URL = "https://kapi.kakao.com/v2/api/talk/memo/default/send"
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.yaml")
 
 MESSAGE_TEMPLATE = """\
-📝 [{source_name}] 신규 글 알림
+🆕 [{source_name}] {label} 알림
 
-제목: {title}
-요약: {summary}
-키워드: {keywords}
+📌 {title}
 
-원문 보기 ▶ {url}"""
+{summary}
+
+{keywords_line}
+🔗 {url}"""
 
 
-def _load_source_name_map() -> dict:
-    """config.yaml의 blogs/youtube_channels 목록에서 {source_id: 표시이름} 매핑을 만든다."""
+def _load_source_map() -> dict:
+    """config.yaml의 blogs/youtube_channels 목록에서 {source_id: {name, type}} 매핑을 만든다."""
     with open(CONFIG_PATH, encoding="utf-8") as f:
         cfg = yaml.safe_load(f)
 
-    name_map = {}
+    source_map = {}
     for blog in cfg.get("blogs") or []:
-        name_map[blog["blog_id"]] = blog.get("name", blog["blog_id"])
+        source_map[blog["blog_id"]] = {"name": blog.get("name", blog["blog_id"]), "type": "blog"}
     for channel in cfg.get("youtube_channels") or []:
-        name_map[channel["channel_id"]] = channel.get("name", channel["channel_id"])
-    return name_map
+        source_map[channel["channel_id"]] = {"name": channel.get("name", channel["channel_id"]), "type": "youtube"}
+    return source_map
 
 
 def _build_template(post: dict) -> dict:
-    source_name = _load_source_name_map().get(post["blog_id"], post["blog_id"])
+    source = _load_source_map().get(post["blog_id"], {"name": post["blog_id"], "type": "blog"})
+    label = "새로운 영상" if source["type"] == "youtube" else "새로운 글"
+
+    keywords = [k.strip() for k in post.get("keywords", "").split(",") if k.strip()]
+    keywords_line = " ".join(f"#{k}" for k in keywords) if keywords else ""
+
     text = MESSAGE_TEMPLATE.format(
-        source_name=source_name,
+        source_name=source["name"],
+        label=label,
         title=post["title"],
         summary=post.get("summary", ""),
-        keywords=post.get("keywords", ""),
+        keywords_line=keywords_line,
         url=post["url"],
     )
     return {
@@ -53,7 +60,7 @@ def _build_template(post: dict) -> dict:
             "web_url": post["url"],
             "mobile_web_url": post["url"],
         },
-        "button_title": "원문 보기",
+        "button_title": "원문 보기" if source["type"] == "blog" else "영상 보기",
     }
 
 
