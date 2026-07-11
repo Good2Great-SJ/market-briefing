@@ -36,7 +36,8 @@ def _call_claude(client: Anthropic, model: str, raw_content: str, max_content_le
         max_tokens=1024,
         messages=[{"role": "user", "content": PROMPT_TEMPLATE.format(raw_content=truncated)}],
     )
-    text = message.content[0].text.strip()
+    text_block = next(block for block in message.content if block.type == "text")
+    text = text_block.text.strip()
     if text.startswith("```"):
         text = text.strip("`")
         if text.startswith("json"):
@@ -55,7 +56,7 @@ def summarize(post: dict) -> dict:
         try:
             result = _call_claude(client, cfg["model"], post["raw_content"], cfg["max_content_length"])
             break
-        except (json.JSONDecodeError, KeyError, IndexError) as exc:
+        except (json.JSONDecodeError, KeyError, IndexError, StopIteration) as exc:
             last_error = exc
             continue
 

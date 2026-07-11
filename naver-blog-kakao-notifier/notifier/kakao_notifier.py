@@ -1,7 +1,9 @@
 import json
+import os
 from datetime import datetime, timezone
 
 import requests
+import yaml
 from dotenv import load_dotenv
 
 from auth.kakao_auth import refresh_access_token
@@ -10,9 +12,10 @@ from db.db import get_kakao_tokens, update_post_status
 load_dotenv()
 
 SEND_URL = "https://kapi.kakao.com/v2/api/talk/memo/default/send"
+CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.yaml")
 
 MESSAGE_TEMPLATE = """\
-📝 [{blog_id}] 신규 글 알림
+📝 [{source_name}] 신규 글 알림
 
 제목: {title}
 요약: {summary}
@@ -21,9 +24,23 @@ MESSAGE_TEMPLATE = """\
 원문 보기 ▶ {url}"""
 
 
+def _load_source_name_map() -> dict:
+    """config.yaml의 blogs/youtube_channels 목록에서 {source_id: 표시이름} 매핑을 만든다."""
+    with open(CONFIG_PATH, encoding="utf-8") as f:
+        cfg = yaml.safe_load(f)
+
+    name_map = {}
+    for blog in cfg.get("blogs") or []:
+        name_map[blog["blog_id"]] = blog.get("name", blog["blog_id"])
+    for channel in cfg.get("youtube_channels") or []:
+        name_map[channel["channel_id"]] = channel.get("name", channel["channel_id"])
+    return name_map
+
+
 def _build_template(post: dict) -> dict:
+    source_name = _load_source_name_map().get(post["blog_id"], post["blog_id"])
     text = MESSAGE_TEMPLATE.format(
-        blog_id=post["blog_id"],
+        source_name=source_name,
         title=post["title"],
         summary=post.get("summary", ""),
         keywords=post.get("keywords", ""),

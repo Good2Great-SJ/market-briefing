@@ -2,12 +2,19 @@ watch_mode: rss   # rss | search_api
 
 blogs:
   - blog_id: "ranto28"
+    name: "메르"
   - blog_id: "butterdaddy"
+    name: "버터대디"
   - blog_id: "james_lee_advisors"
+    name: "James Lee"
   - blog_id: "egzion"
+    name: "이그전"
   - blog_id: "plainvanilla_invest"
+    name: "플레인바닐라"
   - blog_id: "andree77"
+    name: "경제적자유"
   - blog_id: "jeunkim"
+    name: "피우스"
 
 search_api:
   keywords:
