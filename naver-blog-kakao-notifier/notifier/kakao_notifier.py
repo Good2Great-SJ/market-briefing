@@ -22,6 +22,7 @@ MESSAGE_TEMPLATE = """\
 {summary}
 
 {keywords_line}
+
 🔗 {url}"""
 
 
