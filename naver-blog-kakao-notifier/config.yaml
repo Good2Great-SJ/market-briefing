@@ -1,7 +1,13 @@
 watch_mode: rss   # rss | search_api
 
 blogs:
-  - blog_id: "example_blog_id"
+  - blog_id: "ranto28"
+  - blog_id: "butterdaddy"
+  - blog_id: "james_lee_advisors"
+  - blog_id: "egzion"
+  - blog_id: "plainvanilla_invest"
+  - blog_id: "andree77"
+  - blog_id: "jeunkim"
 
 search_api:
   keywords:
