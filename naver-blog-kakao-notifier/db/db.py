@@ -2,12 +2,24 @@ import os
 import sqlite3
 from datetime import datetime, timezone
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "state.db")
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.path.join(PROJECT_ROOT, "state.db")
+# 카카오 토큰은 state.db와 별도 파일에 저장한다. state.db는 dedup 상태 유지를 위해
+# git에 커밋되지만(민감정보 없음), kakao_tokens.db는 항상 .gitignore 대상이라
+# 실 토큰이 git 히스토리에 남지 않는다.
+TOKENS_DB_PATH = os.path.join(PROJECT_ROOT, "kakao_tokens.db")
 SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "schema.sql")
+TOKENS_SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "schema_tokens.sql")
 
 
 def get_connection() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def get_tokens_connection() -> sqlite3.Connection:
+    conn = sqlite3.connect(TOKENS_DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -20,6 +32,14 @@ def init_db():
         conn.commit()
     finally:
         conn.close()
+
+    tokens_conn = get_tokens_connection()
+    try:
+        with open(TOKENS_SCHEMA_PATH, encoding="utf-8") as f:
+            tokens_conn.executescript(f.read())
+        tokens_conn.commit()
+    finally:
+        tokens_conn.close()
 
 
 def post_exists(post_id: str) -> bool:
@@ -80,7 +100,7 @@ def update_post_status(post_id: str, status: str, **fields):
 
 
 def save_kakao_tokens(access_token: str, refresh_token: str, expires_at: str):
-    conn = get_connection()
+    conn = get_tokens_connection()
     try:
         conn.execute(
             """
@@ -99,7 +119,7 @@ def save_kakao_tokens(access_token: str, refresh_token: str, expires_at: str):
 
 
 def get_kakao_tokens():
-    conn = get_connection()
+    conn = get_tokens_connection()
     try:
         row = conn.execute(
             "SELECT access_token, refresh_token, expires_at FROM kakao_tokens WHERE id = 1"

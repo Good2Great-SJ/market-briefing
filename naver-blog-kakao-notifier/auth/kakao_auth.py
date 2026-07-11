@@ -81,5 +81,24 @@ def refresh_access_token() -> dict:
     return get_kakao_tokens()
 
 
+def ensure_session():
+    """토큰 DB가 비어 있으면(예: CI 환경의 새 체크아웃) KAKAO_REFRESH_TOKEN 환경변수로 세션을 초기화한다.
+
+    로컬 개발 환경은 이미 kakao_tokens.db에 토큰이 있으므로 아무 것도 하지 않는다.
+    """
+    if get_kakao_tokens():
+        return
+
+    env_refresh_token = os.environ.get("KAKAO_REFRESH_TOKEN")
+    if not env_refresh_token:
+        raise RuntimeError(
+            "카카오 토큰이 없습니다. auth/kakao_auth.py로 먼저 인증하거나, "
+            "KAKAO_REFRESH_TOKEN 환경변수(GitHub Secrets)를 설정하세요."
+        )
+
+    save_kakao_tokens(access_token="", refresh_token=env_refresh_token, expires_at="1970-01-01T00:00:00+00:00")
+    refresh_access_token()
+
+
 if __name__ == "__main__":
     request_initial_tokens()

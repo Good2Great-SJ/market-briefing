@@ -4,6 +4,7 @@ from datetime import datetime
 
 import yaml
 
+from auth.kakao_auth import ensure_session
 from collector.naver_rss import fetch_new_posts
 from db.db import get_posts_by_status, init_db
 from notifier.kakao_notifier import send_notification
@@ -44,6 +45,7 @@ def run_pipeline():
     logger = _setup_logger()
     logger.info("파이프라인 시작")
     init_db()
+    ensure_session()
 
     cfg = _load_config()
     blogs = cfg.get("blogs") or []
