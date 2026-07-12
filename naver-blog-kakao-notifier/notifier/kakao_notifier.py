@@ -128,6 +128,31 @@ def _send(access_token: str, template_object: dict) -> requests.Response:
     )
 
 
+def send_text_message(text: str, link_url: str, button_title: str = "자세히 보기") -> dict:
+    """임의의 텍스트를 카카오톡 '나에게 보내기'로 발송한다 (컨센서스 리포트 등 post 기반이 아닌 메시지용)."""
+    if len(text) > MAX_TEXT_LENGTH:
+        text = text[: MAX_TEXT_LENGTH - 1] + "…"
+
+    template_object = {
+        "object_type": "text",
+        "text": text,
+        "link": {"web_url": link_url, "mobile_web_url": link_url},
+        "button_title": button_title,
+    }
+
+    tokens = get_kakao_tokens()
+    if not tokens:
+        raise RuntimeError("카카오 토큰이 없습니다. auth/kakao_auth.py로 먼저 인증하세요.")
+
+    resp = _send(tokens["access_token"], template_object)
+    if resp.status_code == 401:
+        tokens = refresh_access_token()
+        resp = _send(tokens["access_token"], template_object)
+
+    resp.raise_for_status()
+    return resp.json()
+
+
 def send_notification(post: dict) -> dict:
     """post를 카카오톡 '나에게 보내기'로 발송하고, 성공 시 status='notified'로 갱신한다."""
     tokens = get_kakao_tokens()

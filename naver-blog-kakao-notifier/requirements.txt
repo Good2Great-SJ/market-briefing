@@ -5,3 +5,4 @@ python-dotenv>=1.0.1
 anthropic>=0.40.0
 beautifulsoup4>=4.12.3
 yt-dlp>=2026.7.4
+pdfplumber>=0.11.4

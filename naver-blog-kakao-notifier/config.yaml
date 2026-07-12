@@ -24,6 +24,24 @@ search_api:
 schedule:
   interval_minutes: 60
 
+watchlist_stocks:
+  - item_code: "005930"
+    name: "삼성전자"
+  - item_code: "000660"
+    name: "SK하이닉스"
+  - item_code: "005380"
+    name: "현대자동차"
+  - item_code: "329180"
+    name: "HD현대중공업"
+  - item_code: "009150"
+    name: "삼성전기"
+  - item_code: "010120"
+    name: "LS ELECTRIC"
+
+consensus:
+  lookback_days_bootstrap: 183   # 최초 등록 시 백필 기간
+  model: "claude-sonnet-5"
+
 summarizer:
   max_content_length: 6000   # 요약 전 truncate 기준 (자)
   model: "claude-sonnet-5"
