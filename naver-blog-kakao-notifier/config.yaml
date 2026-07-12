@@ -13,8 +13,6 @@ blogs:
     name: "플레인바닐라"
   - blog_id: "andree77"
     name: "경제적자유"
-  - blog_id: "jeunkim"
-    name: "피우스"
   - blog_id: "going_tothe_moon"
     name: "고잉투더문"
 
