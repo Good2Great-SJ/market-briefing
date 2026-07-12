@@ -70,7 +70,7 @@ def run_pipeline():
     for channel in youtube_channels:
         channel_id = channel["channel_id"]
         try:
-            new_videos = fetch_new_videos(channel_id)
+            new_videos = fetch_new_videos(channel_id, exclude_keywords=channel.get("exclude_keywords"))
             collected_count += len(new_videos)
             logger.info(f"[수집] {channel_id}: 신규 {len(new_videos)}건")
         except Exception:

@@ -25,10 +25,13 @@ def _fetch_transcript(video_id: str) -> str:
     return "\n".join(segment.text for segment in transcript)
 
 
-def fetch_new_videos(channel_id: str, fetch_transcript: bool = True) -> list[dict]:
+def fetch_new_videos(
+    channel_id: str, fetch_transcript: bool = True, exclude_keywords: list[str] | None = None
+) -> list[dict]:
     """채널 RSS에서 신규 영상을 조회하고, 중복 필터링 후 DB에 저장한다.
 
     fetch_transcript=False면 자막 조회를 건너뛴다 (기준선/백로그 처리용).
+    exclude_keywords에 해당하는 문자열이 제목에 포함된 영상은 수집 대상에서 제외한다.
     자막이 없는 영상은 요약할 소재가 없으므로 status='summarize_failed'로 즉시 처리한다.
     """
     feed = feedparser.parse(RSS_URL_TEMPLATE.format(channel_id=channel_id), request_headers=HEADERS)
@@ -40,6 +43,9 @@ def fetch_new_videos(channel_id: str, fetch_transcript: bool = True) -> list[dic
             continue
 
         if "/shorts/" in entry.link:
+            continue
+
+        if exclude_keywords and any(keyword in entry.title for keyword in exclude_keywords):
             continue
 
         post_id = f"{channel_id}_{video_id}"

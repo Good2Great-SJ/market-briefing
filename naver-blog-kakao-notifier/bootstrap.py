@@ -52,7 +52,9 @@ def bootstrap(only_id: str | None = None):
         channel_id = channel["channel_id"]
         if only_id and channel_id != only_id:
             continue
-        new_videos = fetch_new_videos(channel_id, fetch_transcript=False)
+        new_videos = fetch_new_videos(
+            channel_id, fetch_transcript=False, exclude_keywords=channel.get("exclude_keywords")
+        )
         count = _mark_baseline(new_videos, now)
         print(f"{channel_id}: {count}건 기준선 처리")
         total += count

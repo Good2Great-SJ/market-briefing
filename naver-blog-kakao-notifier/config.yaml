@@ -44,6 +44,9 @@ youtube_channels:
   - channel_id: "UCIUni4ScRp4mqPXsxy62L5w"
     name: "Understanding"
     handle: "understanding."
+    exclude_keywords:
+      - "북언더스탠딩"
+      - "일상 언더스탠딩"
   - channel_id: "UCupslRq5jW95UGzPjOZz0FA"
     name: "와이스트릿"
     handle: "Ystreet"
