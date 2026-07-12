@@ -6,7 +6,7 @@ import yaml
 
 from auth.kakao_auth import ensure_session
 from collector.naver_rss import fetch_new_posts
-from collector.youtube_rss import fetch_new_videos
+from collector.youtube_rss import fetch_new_videos, retry_pending_transcripts
 from db.db import get_posts_by_status, init_db
 from notifier.kakao_notifier import send_notification
 from summarizer.summarizer import summarize
@@ -76,6 +76,12 @@ def run_pipeline():
         except Exception:
             error_count += 1
             logger.exception(f"[수집 실패] {channel_id}")
+
+    try:
+        retry_pending_transcripts()
+    except Exception:
+        error_count += 1
+        logger.exception("[자막 재시도 실패]")
 
     for post in get_posts_by_status("collected"):
         try:
