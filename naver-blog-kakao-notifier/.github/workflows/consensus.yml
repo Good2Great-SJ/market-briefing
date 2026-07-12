@@ -1,0 +1,41 @@
+name: Stock Consensus Check
+
+on:
+  schedule:
+    # 매일 1회, 한국시간 오전 8시(UTC 전일 23:00) 실행. 기존 블로그/유튜브 알리미(notify.yml)와는
+    # 별도 워크플로우로, 워치리스트 종목 증권사 리포트 컨센서스만 체크한다.
+    - cron: "0 23 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  run-consensus-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run consensus check
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          KAKAO_REST_API_KEY: ${{ secrets.KAKAO_REST_API_KEY }}
+          KAKAO_CLIENT_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
+          KAKAO_REDIRECT_URI: ${{ secrets.KAKAO_REDIRECT_URI }}
+          KAKAO_REFRESH_TOKEN: ${{ secrets.KAKAO_REFRESH_TOKEN }}
+        run: python daily_consensus_check.py
+
+      - name: Commit updated state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f state.db consensus_checkpoint.json
+          git diff --cached --quiet || git commit -m "chore: update consensus state [skip ci]"
+          git push
