@@ -646,11 +646,16 @@ def render_narrative(narr, summary, src=None):
 
 
 def _paragraphs(text):
-    """긴 텍스트를 \\n 기준으로 <p> 단락으로 변환(길이 제한 없이 전문 표시)."""
+    """긴 텍스트를 \\n 기준으로 <p> 단락으로 변환(길이 제한 없이 전문 표시).
+    마지막 단락은 결론 문단으로 보고 구분선을 넣어 시각적으로 분리한다."""
     if not text:
         return "<p></p>"
     parts = [p.strip() for p in text.split("\n") if p.strip()]
-    return "".join(f"<p>{p}</p>" for p in parts) or f"<p>{text}</p>"
+    if not parts:
+        return f"<p>{text}</p>"
+    html = "".join(f"<p>{p}</p>" for p in parts[:-1])
+    html += f'<p class="ov-concl">{parts[-1]}</p>'
+    return html
 
 
 def render_fed_odds(fed):
@@ -825,7 +830,8 @@ h2{font-size:29px;font-weight:400;letter-spacing:-.6px;margin:0 0 16px;color:var
 .brief{margin-top:34px;}
 .ov-stack{display:flex;flex-direction:column;gap:14px;}
 .ov-card{background:var(--soft);border-radius:18px;padding:20px 24px;font-size:16px;line-height:1.68;color:var(--ink);}
-.ov-card p{margin:0 0 12px;} .ov-card p:last-child{margin-bottom:0;}
+.ov-card p{margin:0 0 20px;} .ov-card p:last-child{margin-bottom:0;}
+.ov-card p.ov-concl{margin-top:4px;padding-top:16px;border-top:1px solid var(--hair);font-weight:600;}
 .src-card{border-left:3px solid var(--primary);}
 .src-card-h{font-size:13px;font-weight:700;letter-spacing:.02em;color:var(--primary);margin-bottom:10px;}
 .brief-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;}
