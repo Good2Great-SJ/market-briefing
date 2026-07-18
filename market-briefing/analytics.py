@@ -228,3 +228,55 @@ def stock_investor_flows(stocks):
     out["_summary"] = dict(n=len([k for k in out if k != "_summary"]),
                            forgn_buy=f_buy, inst_buy=i_buy)
     return out
+
+
+_FED_TITLE_RE = None  # 지연 컴파일(모듈 임포트 시 re 의존 최소화)
+
+
+def fed_rate_odds():
+    """
+    Polymarket(예측시장)에서 다음 FOMC 회의의 금리 결정 확률을 가져온다.
+    인증 불필요(공개 Gamma API). 실패 시 None(리포트에서 해당 섹션 생략).
+    """
+    import re, json, requests
+    global _FED_TITLE_RE
+    if _FED_TITLE_RE is None:
+        _FED_TITLE_RE = re.compile(r"^Fed Decision in", re.IGNORECASE)
+
+    try:
+        r = requests.get(
+            "https://gamma-api.polymarket.com/events",
+            params={"tag_slug": "fed", "active": "true", "closed": "false", "limit": 50},
+            timeout=10,
+        )
+        r.raise_for_status()
+        events = r.json()
+    except Exception:
+        return None
+
+    candidates = [e for e in events if _FED_TITLE_RE.match(e.get("title") or "")]
+    if not candidates:
+        return None
+    candidates.sort(key=lambda e: e.get("endDate") or "9999")
+    ev = candidates[0]
+
+    buckets = []
+    for m in ev.get("markets", []):
+        try:
+            prices = json.loads(m.get("outcomePrices") or "[]")
+            yes_prob = float(prices[0])
+        except Exception:
+            continue
+        label = m.get("groupItemTitle") or m.get("question") or ""
+        buckets.append(dict(label=label, prob=yes_prob))
+    if not buckets:
+        return None
+    buckets.sort(key=lambda b: -b["prob"])
+
+    return dict(
+        title=ev.get("title") or "",
+        end_date=ev.get("endDate") or "",
+        buckets=buckets,
+        source="Polymarket",
+        source_url=f"https://polymarket.com/event/{ev.get('slug','')}",
+    )

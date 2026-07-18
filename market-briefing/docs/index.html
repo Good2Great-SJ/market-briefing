@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>마켓 브리핑 아카이브</title>
+<style>
+  :root{
+    --bg:#f7f8fa; --card:#ffffff; --ink:#0a0b0d; --body:#3c4048; --muted:#77808c;
+    --hair:#e7e9ec; --primary:#1652f0; --strong:#eef1f6;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#0a0b0d; --card:#151719; --ink:#f2f3f5; --body:#c9cdd3; --muted:#8b93a0; --hair:#2a2d31; --primary:#5b8def; --strong:#1e2124; }
+  }
+  :root[data-theme="dark"]{ --bg:#0a0b0d; --card:#151719; --ink:#f2f3f5; --body:#c9cdd3; --muted:#8b93a0; --hair:#2a2d31; --primary:#5b8def; --strong:#1e2124; }
+  :root[data-theme="light"]{ --bg:#f7f8fa; --card:#ffffff; --ink:#0a0b0d; --body:#3c4048; --muted:#77808c; --hair:#e7e9ec; --primary:#1652f0; --strong:#eef1f6; }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Pretendard,sans-serif;}
+  .topbar{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:14px 18px;background:var(--card);border-bottom:1px solid var(--hair);position:sticky;top:0;z-index:10;}
+  .brand{font-weight:700;font-size:15px;margin-right:auto;white-space:nowrap;}
+  select{appearance:none;background:var(--strong);color:var(--ink);border:1px solid var(--hair);border-radius:10px;padding:9px 14px;font-size:13.5px;min-width:220px;}
+  button{background:var(--primary);color:#fff;border:none;border-radius:10px;padding:9px 16px;font-size:13.5px;font-weight:600;cursor:pointer;white-space:nowrap;}
+  button:active{opacity:.85;}
+  button.ghost{background:var(--strong);color:var(--ink);}
+  .status{font-size:12px;color:var(--muted);white-space:nowrap;}
+  .frame-wrap{height:calc(100vh - 58px);}
+  iframe{width:100%;height:100%;border:none;display:block;background:var(--bg);}
+  .empty{display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:14px;text-align:center;padding:20px;}
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">📊 마켓 브리핑 아카이브</div>
+    <select id="picker"><option>불러오는 중…</option></select>
+    <button id="latestBtn" class="ghost">최신으로</button>
+    <span class="status" id="status"></span>
+  </div>
+  <div class="frame-wrap" id="frameWrap">
+    <div class="empty">리포트를 불러오는 중입니다…</div>
+  </div>
+
+<script>
+const params = new URLSearchParams(location.search);
+const wantSession = params.get("session");
+const wantDate = params.get("date");
+
+const picker = document.getElementById("picker");
+const latestBtn = document.getElementById("latestBtn");
+const statusEl = document.getElementById("status");
+const frameWrap = document.getElementById("frameWrap");
+
+let manifest = [];
+
+function label(r){
+  const sess = r.session === "us" ? "미국 증시 마감" : "한국 증시 마감";
+  return `${r.date} · ${sess}`;
+}
+
+function showReport(r){
+  if (!r){
+    frameWrap.innerHTML = '<div class="empty">표시할 리포트가 없습니다.</div>';
+    return;
+  }
+  frameWrap.innerHTML = "";
+  const iframe = document.createElement("iframe");
+  iframe.src = r.path;
+  frameWrap.appendChild(iframe);
+  const url = new URL(location.href);
+  url.searchParams.set("session", r.session);
+  url.searchParams.set("date", r.date);
+  history.replaceState(null, "", url);
+}
+
+function populate(){
+  picker.innerHTML = "";
+  manifest.forEach((r, i) => {
+    const opt = document.createElement("option");
+    opt.value = i;
+    opt.textContent = label(r);
+    picker.appendChild(opt);
+  });
+}
+
+function selectInitial(){
+  let idx = 0;
+  if (wantSession && wantDate){
+    const found = manifest.findIndex(r => r.session === wantSession && r.date === wantDate);
+    if (found >= 0) idx = found;
+  }
+  picker.value = idx;
+  showReport(manifest[idx]);
+}
+
+async function loadManifest(bust){
+  statusEl.textContent = "불러오는 중…";
+  try{
+    const url = "manifest.json" + (bust ? ("?t=" + Date.now()) : "");
+    const res = await fetch(url, {cache: "no-store"});
+    manifest = await res.json();
+    manifest.sort((a,b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (a.session < b.session ? 1 : -1)));
+    populate();
+    statusEl.textContent = manifest.length ? `총 ${manifest.length}개 리포트` : "리포트 없음";
+    return true;
+  }catch(e){
+    statusEl.textContent = "manifest.json을 불러오지 못했습니다.";
+    return false;
+  }
+}
+
+picker.addEventListener("change", () => showReport(manifest[Number(picker.value)]));
+latestBtn.addEventListener("click", async () => {
+  await loadManifest(true);
+  if (manifest.length){
+    picker.value = 0;
+    showReport(manifest[0]);
+  }
+});
+
+loadManifest(false).then(() => { if (manifest.length) selectInitial(); });
+</script>
+</body>
+</html>

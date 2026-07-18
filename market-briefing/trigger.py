@@ -76,7 +76,7 @@ def check_and_run(now_sgt=None, dry_run=False):
             import briefing, delivery
             result = briefing.build(session=session, theme="coinbase", make_pdf=True)
             _mark_done(session, date_str, reason)
-            _, fn, pdf = result["outputs"][0]
+            _, fn, pdf, report_url, viewer_url = result["outputs"][0]
             fired.append((session, reason, fn))
 
             if pdf:
@@ -84,7 +84,8 @@ def check_and_run(now_sgt=None, dry_run=False):
                     label = "미국 증시 마감" if session == "us" else "한국 증시 마감"
                     subject = f"[{label} 브리핑] {result['ref']}"
                     body = delivery.build_email_body(
-                        session, result["ref"], result["narr"], result["summary"], result["mc"])
+                        session, result["ref"], result["narr"], result["summary"], result["mc"],
+                        link_url=viewer_url or "")
                     delivery.send_email(subject, body, [pdf])
                     print(f"  → 이메일 발송 완료 ({subject})")
                 except Exception as e:
