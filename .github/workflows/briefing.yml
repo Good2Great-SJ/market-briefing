@@ -60,6 +60,11 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -f out/
-          git diff --cached --quiet || git commit -m "chore: 데일리 브리핑 자동 생성 [skip ci]"
+          # 체크윈도우가 아니어서 trigger.py가 아무것도 안 만들면 out/ 자체가 없을 수 있음(정상)
+          if [ -d out ]; then
+            git add -f out/
+            git diff --cached --quiet || git commit -m "chore: 데일리 브리핑 자동 생성 [skip ci]"
+          else
+            echo "out/ 없음 — 이번 실행에서 트리거된 세션이 없어 커밋할 것이 없습니다(정상)"
+          fi
           git push
