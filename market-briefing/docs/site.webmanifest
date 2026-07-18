@@ -1,6 +1,6 @@
 {
-  "name": "마켓 브리핑 아카이브",
-  "short_name": "마켓브리핑",
+  "name": "현자의 서(書)",
+  "short_name": "현자의 서",
   "description": "미국·한국 증시 마감 브리핑 아카이브",
   "start_url": "./",
   "scope": "./",
