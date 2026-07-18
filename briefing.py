@@ -250,9 +250,26 @@ def resolve_session(arg):
     return "us" if 4 <= h < 16 else "kr"
 
 
-def build(session="auto", theme="coinbase", make_pdf=True):
+def _truncate_to_date(data, cutoff):
+    """{ticker: df} 딕셔너리의 각 df를 cutoff 날짜까지만 남기고 자른다(과거 시점 재현용)."""
+    cutoff_ts = pd.Timestamp(cutoff)
+    out = {}
+    for k, df in data.items():
+        trimmed = df[df.index <= cutoff_ts]
+        if len(trimmed) >= 30:
+            out[k] = trimmed
+    return out
+
+
+def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None):
+    """
+    historical_date: datetime.date | 'YYYY-MM-DD' 문자열. 지정하면 그 날짜 마감 기준
+    데이터로 과거 시점 리포트를 재현한다(예: 특정 날짜의 버터대디/증시각도기 콘텐츠에
+    맞춰 리포트를 다시 만들고 싶을 때). 생략하면 항상 최신 데이터를 사용한다.
+    """
     session = resolve_session(session)
-    print(f"■ 세션: {'미국 증시 마감' if session=='us' else '한국 증시 마감'} · 테마: {theme}")
+    print(f"■ 세션: {'미국 증시 마감' if session=='us' else '한국 증시 마감'} · 테마: {theme}"
+          + (f" · 기준일 지정: {historical_date}" if historical_date else ""))
 
     print("· 미국/글로벌/매크로 수집 (yfinance)…")
     yf_data = fetch_yf(U.YF_ALL)
@@ -260,6 +277,12 @@ def build(session="auto", theme="coinbase", make_pdf=True):
     print("· 한국 지수/종목 수집 (FDR)…")
     kr_idx = fetch_fdr(U.KR_INDICES); kr_stk = fetch_fdr(U.KR_STOCKS)
     print(f"  → 지수 {len(kr_idx)}, 종목 {len(kr_stk)}")
+
+    if historical_date:
+        print(f"· {historical_date} 기준으로 데이터 절단…")
+        yf_data = _truncate_to_date(yf_data, historical_date)
+        kr_idx = _truncate_to_date(kr_idx, historical_date)
+        kr_stk = _truncate_to_date(kr_stk, historical_date)
     print("· 예탁금/신용잔고 (네이버)…")
     try:
         money = fetch_kr_money()
@@ -548,7 +571,6 @@ def render_narrative(narr, summary, src=None):
 
     used = narr.get("sources_used") or []
     src_label = " · ".join(used) if used else "웹서치 보강"
-    ov = narr.get("overview", "")
     cps = "".join(f'<li>{c}</li>' for c in narr.get("checkpoints", []))
     news = "".join(
         f'<div class="news-row"><div class="news-t">{n.get("title","")}</div>'
@@ -560,17 +582,41 @@ def render_narrative(narr, summary, src=None):
         for c in narr.get("calendar", []))
     news_html = news or '<div class="mut" style="font-size:13px">오늘 원천 콘텐츠에 특별히 언급된 뉴스가 없습니다.</div>'
     cal_html = cal or '<div class="mut" style="font-size:13px">오늘 원천 콘텐츠에 언급된 일정이 없습니다.</div>'
+
+    # 버터대디/증시각도기 분석을 각각 온전한 별도 카드로 표시(합쳐서 압축하지 않음).
+    # 구버전 스키마(overview 단일 필드)로 온 응답도 하위 호환 처리.
+    bd_text = narr.get("butterdaddy_analysis")
+    jg_text = narr.get("jeungsi_analysis")
+    ov_cards = ""
+    if bd_text or jg_text:
+        if bd_text:
+            ov_cards += f'''<div class="ov-card src-card">
+              <div class="src-card-h">🧡 버터대디 총평</div>{_paragraphs(bd_text)}</div>'''
+        if jg_text:
+            ov_cards += f'''<div class="ov-card src-card">
+              <div class="src-card-h">📺 증시각도기 총평</div>{_paragraphs(jg_text)}</div>'''
+    else:
+        ov_cards = f'<div class="ov-card">{_paragraphs(narr.get("overview", ""))}</div>'
+
     return f'''<section class="brief">
       <div class="eyebrow"><span class="badge badge-key">Briefing</span><span class="sub">근거 · {src_label}</span>
       {f'<span class="src-badges">{src_badges}</span>' if src_badges else ''}</div>
       <h2>오늘의 총평</h2>
-      <div class="ov-card"><p>{ov}</p></div>
+      <div class="ov-stack">{ov_cards}</div>
       <div class="brief-grid">
         <div class="bcard"><div class="bh">주요 체크포인트</div><ul class="cps">{cps}</ul></div>
         <div class="bcard"><div class="bh">시장 영향 뉴스</div>{news_html}</div>
       </div>
       <div class="bcard cal-card"><div class="bh">다가오는 주요 일정</div><div class="cal">{cal_html}</div></div>
     </section>'''
+
+
+def _paragraphs(text):
+    """긴 텍스트를 \\n 기준으로 <p> 단락으로 변환(길이 제한 없이 전문 표시)."""
+    if not text:
+        return "<p></p>"
+    parts = [p.strip() for p in text.split("\n") if p.strip()]
+    return "".join(f"<p>{p}</p>" for p in parts) or f"<p>{text}</p>"
 
 
 def render_mcap(mc):
@@ -722,8 +768,11 @@ h2{font-size:29px;font-weight:400;letter-spacing:-.6px;margin:0 0 16px;color:var
 
 /* 총평 */
 .brief{margin-top:34px;}
+.ov-stack{display:flex;flex-direction:column;gap:14px;}
 .ov-card{background:var(--soft);border-radius:18px;padding:20px 24px;font-size:16px;line-height:1.68;color:var(--ink);}
-.ov-card p{margin:0;}
+.ov-card p{margin:0 0 12px;} .ov-card p:last-child{margin-bottom:0;}
+.src-card{border-left:3px solid var(--primary);}
+.src-card-h{font-size:13px;font-weight:700;letter-spacing:.02em;color:var(--primary);margin-bottom:10px;}
 .brief-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;}
 .bcard{background:var(--card);border:1px solid var(--hair);border-radius:18px;padding:20px 22px;}
 .bh{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;}

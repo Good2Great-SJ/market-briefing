@@ -27,15 +27,27 @@ def html_to_pdf(html_path, pdf_path=None):
 
 
 def build_email_body(session, ref, narr, summary, mc, link_url=""):
-    """이메일 본문. 총평 + 핵심 지표 + 리포트 링크."""
+    """이메일 본문. 총평(소스별 분리, 전문) + 핵심 지표 + 리포트 링크."""
     label = "미국 증시 마감" if session == "us" else "한국 증시 마감"
     lines = [f"[{label} 브리핑] {ref}", ""]
-    if narr and narr.get("overview"):
+    bd = narr.get("butterdaddy_analysis") if narr else None
+    jg = narr.get("jeungsi_analysis") if narr else None
+    if bd or jg:
+        if bd:
+            lines.append("■ 버터대디 총평")
+            lines.append(bd.strip())
+            lines.append("")
+        if jg:
+            lines.append("■ 증시각도기 총평")
+            lines.append(jg.strip())
+            lines.append("")
+    elif narr and narr.get("overview"):
         lines.append(narr["overview"].strip())
+        lines.append("")
     else:
         lines.append(f"상승 {summary['n_up']} / 하락 {summary['n_dn']} · "
                      f"정배열 {summary['arr_g']} / 역배열 {summary['arr_r']}")
-    lines.append("")
+        lines.append("")
     if narr and narr.get("checkpoints"):
         lines.append("체크포인트")
         for c in narr["checkpoints"]:
