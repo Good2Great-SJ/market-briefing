@@ -124,7 +124,7 @@ def compute(df):
         tags.append("신고가 근접")
     if from_lo <= 3:
         tags.append("신저가 근접")
-    return dict(close=close, chg=chg, ma=ma, gap=gap, arr=arr,
+    return dict(close=close, prev=prev, chg=chg, ma=ma, gap=gap, arr=arr,
                 from_hi=from_hi, from_lo=from_lo, tags=tags)
 
 
@@ -172,6 +172,19 @@ def chg_html(g):
         return '<span class="mut">–</span>'
     cls = "up" if g >= 0 else "dn"
     return f'<span class="{cls}">{"+" if g >= 0 else ""}{g:.2f}%</span>'
+
+
+def bps_html(close, prev):
+    """
+    금리(수익률) 티커 전용 — %변화율 대신(또는 병기) bp(basis point) 변동을 표시.
+    yfinance 금리 티커(^TNX 등)는 값 자체가 이미 %단위(예: 4.54=4.54%)이므로
+    close-prev의 차이(퍼센트포인트)에 100을 곱하면 bp 변동이 된다.
+    """
+    if close != close or prev != prev:
+        return '<span class="mut">–</span>'
+    bp = (close - prev) * 100
+    cls = "up" if bp >= 0 else "dn"
+    return f'<span class="{cls}">{"+" if bp >= 0 else ""}{bp:.0f}bp</span>'
 
 
 def tag_html(tags):
@@ -449,14 +462,20 @@ def render(session, ref, now, yf_data, kr_idx, kr_stk, money,
             f'<div class="kcard"><div class="kl">장단기 금리차(10Y-3M)</div>'
             f'<div class="kv num {sp_cls}">{sp:+.2f}%p</div>'
             f'<div class="kc mut">{"정상" if sp>=0 else "역전"}</div></div>')
+    _YIELD_TICKERS = {"^TNX", "^TYX", "^IRX"}
     for tk, nm in U.MACRO:
         if tk not in yf_data:
             continue
         m = compute(yf_data[tk])
+        if tk in _YIELD_TICKERS:
+            # 금리는 %변화율만으로는 감이 안 잡히므로 bp 변동을 우선 표시하고 %는 괄호로 병기
+            chg_part = f'{bps_html(m["close"], m["prev"])} <span class="mut">({chg_html(m["chg"])})</span>'
+        else:
+            chg_part = chg_html(m["chg"])
         macro_cards.append(
             f'<div class="kcard"><div class="kl">{nm}</div>'
             f'<div class="kv num">{fmt_price(m["close"])}</div>'
-            f'<div class="kc num">{chg_html(m["chg"])}</div></div>')
+            f'<div class="kc num">{chg_part}</div></div>')
     macro_html = f'<div class="kpi">{"".join(macro_cards)}</div>'
 
     # ── 시총 수준 섹션 ──
@@ -784,7 +803,7 @@ ul.cps{margin:0;padding-left:18px;} ul.cps li{margin:7px 0;line-height:1.5;}
 .cal-card{margin-top:14px;}
 .cal{display:grid;grid-template-columns:repeat(2,1fr);gap:8px 24px;}
 .cal-row{display:flex;gap:12px;padding:6px 0;border-bottom:1px solid var(--hairsoft);font-size:13.5px;}
-.cal-d{font-family:var(--mono);color:var(--primary);font-weight:600;min-width:92px;}
+.cal-d{font-family:var(--mono);color:var(--primary);font-weight:600;min-width:112px;white-space:nowrap;}
 .cal-e{color:var(--ink);}
 
 .kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
