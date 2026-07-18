@@ -1,0 +1,207 @@
+# -*- coding: utf-8 -*-
+"""
+버터대디(블로그) / 증시각도기(유튜브) 원천 콘텐츠 로더.
+
+naver-blog-kakao-notifier가 이미 수집·요약해 쌓아둔 state.db를 그대로 읽어
+market-briefing 총평의 1차 근거로 사용한다.
+
+채택 조건 (둘 다 만족해야 함):
+  1) 날짜 일치 — 제목에 날짜가 명시돼 있으면(예: "7.16(목)", "[7월 18일 토요일 미국시황]")
+     그 날짜를, 없으면 발행시각(KST 캘린더 날짜)을 리포트의 "기대 날짜"와 정확히 비교.
+     세션별 기대 날짜: us = ref_date(미국장 마감 거래일)+1일, kr = ref_date(한국장 마감 거래일) 그대로.
+  2) 세션(주제) 일치 — 증시각도기는 제목에 "미국시황"/"한국시황"이 명시돼 있어 그걸
+     최우선으로 사용해 구분한다. 그런 태그가 없는 글(버터대디 등)은 발행시각의 KST
+     시간대(아침=미국장 리캡, 저녁=한국장 리캡)로 판정한다.
+  둘 중 하나라도 어긋나면 "아직 미발행"으로 간주해 사용하지 않는다.
+"""
+import os, re, sqlite3, datetime
+
+NOTIFIER_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "naver-blog-kakao-notifier"))
+DB_PATH = os.path.join(NOTIFIER_DIR, "state.db")
+
+BUTTERDADDY_BLOG_ID = "butterdaddy"
+JEUNGSI_CHANNEL_ID = "UCdOjVxkj5JA0iDu3_xcsTyQ"  # 증시각도기 (config.yaml 기준)
+
+KST = datetime.timezone(datetime.timedelta(hours=9))
+LOOKBACK_ROWS = 8  # 최근 N개 글/영상 중에서 기대 날짜+세션과 일치하는 것을 찾는다
+
+# 버터대디는 하루 두 번(미국장 리캡=KST 아침, 한국장 리캡=KST 저녁) 올린다.
+# 발행시각(KST)으로 어느 세션 글인지 구분. 증시각도기는 늘 아침대 업로드 → 자연히 us만 매칭.
+_HOUR_RANGE = {"us": (3, 13), "kr": (14, 23)}
+
+_DATE_PATTERNS = [
+    re.compile(r"(\d{1,2})[.\-/월]\s*(\d{1,2})\s*일?"),  # 7.16 / 7-16 / 7/16 / 7월 16일
+]
+
+
+def _extract_title_date(title, year_hint):
+    """제목에서 M.D 형태 날짜를 뽑아 그 해의 date로 변환. 못 찾으면 None."""
+    if not title:
+        return None
+    for pat in _DATE_PATTERNS:
+        m = pat.search(title)
+        if m:
+            month, day = int(m.group(1)), int(m.group(2))
+            if 1 <= month <= 12 and 1 <= day <= 31:
+                try:
+                    return datetime.date(year_hint, month, day)
+                except ValueError:
+                    continue
+    return None
+
+
+def expected_date(session, ref_date):
+    """세션별로 원천 콘텐츠가 다뤄야 할 '기대 날짜'(KST 캘린더 기준)."""
+    if session == "us":
+        return ref_date + datetime.timedelta(days=1)
+    return ref_date
+
+
+def _row_effective_date(row):
+    """제목에 명시된 날짜 우선, 없으면 published_at의 KST 캘린더 날짜."""
+    pub = row["_published_dt"]
+    title_date = _extract_title_date(row["title"], pub.year)
+    if title_date:
+        return title_date
+    return pub.astimezone(KST).date()
+
+
+_SIHWANG_PATTERN = re.compile(r"(\S+)시황")
+
+
+def _title_session_hint(title):
+    """
+    제목에 'OO시황' 태그가 있으면(증시각도기가 주로 사용) 그걸 최우선 판정 기준으로 쓴다.
+    '미국시황'→us, '한국시황'→kr, 그 외('중국시황' 등)는 두 세션 어디에도 해당하지
+    않는 별개 주제이므로 "other"로 명시적으로 제외한다(시간대 폴백으로 잘못 채택되는 것 방지).
+    """
+    if not title:
+        return None
+    m = _SIHWANG_PATTERN.search(title)
+    if not m:
+        return None
+    tag = m.group(1)
+    if "미국" in tag:
+        return "us"
+    if "한국" in tag:
+        return "kr"
+    return "other"
+
+
+def _matches_session(row, session):
+    """
+    어느 세션(미국장/한국장) 콘텐츠인지 판정.
+    1순위: 제목의 'OO시황' 태그. 2순위: 태그가 없으면 발행시각(KST 시간대)으로 판정(버터대디 등).
+    """
+    hint = _title_session_hint(row["title"])
+    if hint == "other":
+        return False
+    if hint is not None:
+        return hint == session
+    lo, hi = _HOUR_RANGE[session]
+    hour = row["_published_dt"].astimezone(KST).hour
+    return lo <= hour <= hi
+
+
+def _fetch_candidates(blog_id):
+    if not os.path.exists(DB_PATH):
+        return []
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        "SELECT post_id, blog_id, title, url, published_at, summary, raw_content, status "
+        "FROM posts WHERE blog_id = ? ORDER BY published_at DESC LIMIT ?",
+        (blog_id, LOOKBACK_ROWS),
+    ).fetchall()
+    conn.close()
+    out = []
+    for r in rows:
+        item = dict(r)
+        try:
+            pub = datetime.datetime.fromisoformat(item["published_at"])
+        except Exception:
+            continue
+        if pub.tzinfo is None:
+            pub = pub.replace(tzinfo=datetime.timezone.utc)
+        item["_published_dt"] = pub
+        out.append(item)
+    return out
+
+
+def _find_matching(blog_id, want_date, session):
+    """
+    날짜가 맞는 후보 중에서, 'OO시황' 명시 태그로 세션이 정확히 확인된 것을 최우선으로
+    선택한다(발행시각이 더 늦은 미태그 글이 먼저 스캔돼 태그된 글을 가리는 것을 방지).
+    태그된 후보가 없을 때만 발행시각 기반 폴백 매칭으로 넘어간다.
+    """
+    candidates = [c for c in _fetch_candidates(blog_id) if _row_effective_date(c) == want_date]
+    for item in candidates:
+        if _title_session_hint(item["title"]) == session:
+            return item
+    for item in candidates:
+        if _matches_session(item, session):
+            return item
+    return None
+
+
+def ensure_summary(item):
+    """summary가 비어있으면(아직 요약 전) naver-blog-kakao-notifier의 summarizer로 즉석 요약."""
+    if not item or item.get("summary"):
+        return item
+    if not item.get("raw_content"):
+        return item
+    try:
+        import sys
+        from dotenv import load_dotenv
+        load_dotenv(os.path.join(NOTIFIER_DIR, ".env"))
+        sys.path.insert(0, NOTIFIER_DIR)
+        from summarizer.summarizer import summarize
+        result = summarize({"post_id": item["post_id"], "raw_content": item["raw_content"]})
+        item["summary"] = result.get("summary", "")
+    except Exception as e:
+        print("  ! 즉석 요약 실패:", repr(e)[:150])
+    return item
+
+
+def get_sources_for_label_date(want_date, session):
+    """want_date(기대 날짜, KST 캘린더)와 session(미국/한국 리캡 시간대)을 모두 만족하는 것만 채택."""
+    bd = ensure_summary(_find_matching(BUTTERDADDY_BLOG_ID, want_date, session))
+    jg = ensure_summary(_find_matching(JEUNGSI_CHANNEL_ID, want_date, session))
+    return {"butterdaddy": bd, "증시각도기": jg}
+
+
+def get_session_sources(session, ref_date):
+    """
+    session: 'us' | 'kr'
+    ref_date: 리포트의 데이터 기준일(datetime.date) — 세션에 맞는 시장의 마지막 거래일.
+    반환: {"butterdaddy": item|None, "증시각도기": item|None}
+    """
+    return get_sources_for_label_date(expected_date(session, ref_date), session)
+
+
+def has_any(sources):
+    return bool(sources) and any(sources.values())
+
+
+MAX_RAW_CHARS = 8000
+
+
+def to_prompt_block(sources):
+    """
+    narrative.py 프롬프트에 삽입할 원천 콘텐츠 텍스트 블록.
+    naver-blog-kakao-notifier가 만든 summary는 자체 요약 과정에서 주어(어느 나라/
+    시장 얘기인지) 오류가 발생한 사례가 확인되어, 신뢰도가 더 높은 원본
+    (raw_content — 자막/본문 원문)을 우선 사용한다. summary는 raw_content가
+    없을 때만 보조로 사용.
+    """
+    parts = []
+    for label, item in (sources or {}).items():
+        if not item:
+            continue
+        raw = (item.get("raw_content") or "").strip()
+        if raw:
+            text = raw[:MAX_RAW_CHARS]
+            parts.append(f"[{label} — {item['title']}] ({item['published_at']}) [원본 자막/본문]\n{text}")
+        elif item.get("summary"):
+            parts.append(f"[{label} — {item['title']}] ({item['published_at']}) [요약본]\n{item['summary']}")
+    return "\n\n".join(parts)

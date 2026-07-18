@@ -1,0 +1,62 @@
+name: Market Briefing Trigger Check
+
+# 미국장 마감 체크윈도우(싱가폴 07:00~12:00 = UTC 23:00~04:00)와
+# 한국장 마감 체크윈도우(싱가폴 17:00~23:00 = UTC 09:00~15:00) 동안
+# 15분 간격으로 trigger.py만 실행 — 원천 콘텐츠(버터대디/증시각도기)가
+# 확인되면 그 순간 즉시 briefing.build()가 실행되고, 확인 안 되면 그냥 종료된다.
+on:
+  schedule:
+    - cron: "*/15 23 * * *"   # 싱가폴 07:00~07:45
+    - cron: "*/15 0-4 * * *"  # 싱가폴 08:00~12:45 (하드스톱 12:00 포함)
+    - cron: "*/15 9-15 * * *" # 싱가폴 17:00~23:45 (하드스톱 23:00 포함)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  check-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout market-briefing
+        uses: actions/checkout@v4
+        with:
+          path: market-briefing
+
+      # 버터대디/증시각도기 최신 수집 상태(state.db)를 읽기 위해 sibling으로 체크아웃.
+      # sources.py는 ../naver-blog-kakao-notifier/state.db 경로를 참조한다.
+      - name: Checkout naver-blog-kakao-notifier (최신 state.db)
+        uses: actions/checkout@v4
+        with:
+          repository: Good2Great-SJ/naver-blog-kakao-notifier
+          path: naver-blog-kakao-notifier
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        working-directory: market-briefing
+        run: |
+          pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Run trigger check
+        working-directory: market-briefing
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          EMAIL_SMTP_HOST: ${{ secrets.EMAIL_SMTP_HOST }}
+          EMAIL_SMTP_PORT: ${{ secrets.EMAIL_SMTP_PORT }}
+          EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
+          EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}
+          EMAIL_RECEIVER: ${{ secrets.EMAIL_RECEIVER }}
+        run: python trigger.py
+
+      - name: Commit trigger markers + 생성된 리포트
+        working-directory: market-briefing
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f out/
+          git diff --cached --quiet || git commit -m "chore: 데일리 브리핑 자동 생성 [skip ci]"
+          git push

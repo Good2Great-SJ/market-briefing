@@ -1,0 +1,6 @@
+.env
+__pycache__/
+*.pyc
+out/*.html
+out/*.pdf
+!out/.gitkeep
