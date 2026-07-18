@@ -658,25 +658,51 @@ def _paragraphs(text):
     return html
 
 
-def render_fed_odds(fed):
-    if not fed or not fed.get("buckets"):
+def render_fed_odds(fed_list):
+    if not fed_list:
         return '<div class="fed-card mut" style="font-size:13px">Polymarket 데이터를 가져오지 못했습니다.</div>'
-    end_date = (fed.get("end_date") or "")[:10]
-    top_label = fed["buckets"][0]["label"]
-    rows = ""
-    for b in fed["buckets"]:
-        pct = b["prob"] * 100
-        cls = " fed-top" if b["label"] == top_label else ""
-        rows += (f'<div class="fed-row{cls}"><div class="fed-label">{b["label"]}</div>'
-                 f'<div class="fed-bar"><div class="fed-fill" style="width:{pct:.1f}%"></div></div>'
-                 f'<div class="fed-pct num">{pct:.1f}%</div></div>')
-    src_url = fed.get("source_url", "")
-    return f'''<div class="fed-card">
-      <div class="fed-h">{fed.get("title","")} <span class="mut" style="font-weight:400">(회의일 {end_date} 기준)</span></div>
-      {rows}
-      <div class="mut" style="font-size:11px;margin-top:10px">출처: <a href="{src_url}" target="_blank" rel="noopener">Polymarket 예측시장</a>
-      · 실시간 베팅 오즈 기반 확률이며 확정된 결과가 아닙니다.</div>
-    </div>'''
+
+    def tab_label(end_date):
+        try:
+            return f"{end_date[2:4]}.{end_date[5:7]}"
+        except Exception:
+            return "?"
+
+    tabs, panels = "", ""
+    for i, fed in enumerate(fed_list):
+        end_date = (fed.get("end_date") or "")[:10]
+        active = " fed-tab-active" if i == 0 else ""
+        tabs += f'<button type="button" class="fed-tab{active}" onclick="fedShow(this,{i})">{tab_label(fed.get("end_date",""))}</button>'
+
+        top_label = fed["buckets"][0]["label"]
+        rows = ""
+        for b in fed["buckets"]:
+            pct = b["prob"] * 100
+            cls = " fed-top" if b["label"] == top_label else ""
+            rows += (f'<div class="fed-row{cls}"><div class="fed-label">{b["label"]}</div>'
+                     f'<div class="fed-bar"><div class="fed-fill" style="width:{pct:.1f}%"></div></div>'
+                     f'<div class="fed-pct num">{pct:.1f}%</div></div>')
+        src_url = fed.get("source_url", "")
+        disp = "" if i == 0 else "display:none;"
+        panels += f'''<div class="fed-panel" id="fed-panel-{i}" style="{disp}">
+          <div class="fed-h">{fed.get("title","")} <span class="mut" style="font-weight:400">(회의일 {end_date} 기준)</span></div>
+          {rows}
+          <div class="mut" style="font-size:11px;margin-top:10px">출처: <a href="{src_url}" target="_blank" rel="noopener">Polymarket 예측시장</a>
+          · 실시간 베팅 오즈 기반 확률이며 확정된 결과가 아닙니다.</div>
+        </div>'''
+
+    tabs_html = f'<div class="fed-tabs">{tabs}</div>' if len(fed_list) > 1 else ""
+    script = '''<script>
+    function fedShow(btn, idx){
+      var tabs = btn.parentElement.querySelectorAll(".fed-tab");
+      tabs.forEach(function(t){ t.classList.remove("fed-tab-active"); });
+      btn.classList.add("fed-tab-active");
+      document.querySelectorAll(".fed-panel").forEach(function(p){ p.style.display = "none"; });
+      document.getElementById("fed-panel-" + idx).style.display = "";
+    }
+    </script>''' if len(fed_list) > 1 else ""
+
+    return f'<div class="fed-card">{tabs_html}{panels}</div>{script}'
 
 
 def render_mcap(mc):
@@ -884,6 +910,9 @@ border-radius:100px;padding:4px 12px;margin-bottom:10px;}
 .fed-row.fed-top .fed-fill{background:var(--primary);}
 .fed-row.fed-top .fed-label{font-weight:600;color:var(--ink);}
 .fed-pct{font-size:13px;text-align:right;color:var(--ink);}
+.fed-tabs{display:flex;gap:8px;margin-bottom:16px;}
+.fed-tab{background:var(--strong);color:var(--body);border:none;border-radius:100px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;}
+.fed-tab-active{background:var(--primary);color:#fff;}
 
 .table-card{background:var(--card);border:1px solid var(--hair);border-radius:20px;overflow-x:auto;margin-bottom:8px;}
 table.scan{width:100%;border-collapse:collapse;font-size:13.5px;}
