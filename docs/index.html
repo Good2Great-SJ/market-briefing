@@ -2,8 +2,18 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>마켓 브리핑 아카이브</title>
+
+<link rel="manifest" href="site.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="theme-color" content="#1652f0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="마켓브리핑">
+<meta name="mobile-web-app-capable" content="yes">
+
 <style>
   :root{
     --bg:#f7f8fa; --card:#ffffff; --ink:#0a0b0d; --body:#3c4048; --muted:#77808c;
@@ -16,7 +26,7 @@
   :root[data-theme="light"]{ --bg:#f7f8fa; --card:#ffffff; --ink:#0a0b0d; --body:#3c4048; --muted:#77808c; --hair:#e7e9ec; --primary:#1652f0; --strong:#eef1f6; }
   *{box-sizing:border-box;}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Pretendard,sans-serif;}
-  .topbar{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:14px 18px;background:var(--card);border-bottom:1px solid var(--hair);position:sticky;top:0;z-index:10;}
+  .topbar{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:14px 18px;padding-top:calc(14px + env(safe-area-inset-top));background:var(--card);border-bottom:1px solid var(--hair);position:sticky;top:0;z-index:10;}
   .brand{font-weight:700;font-size:15px;margin-right:auto;white-space:nowrap;}
   select{appearance:none;background:var(--strong);color:var(--ink);border:1px solid var(--hair);border-radius:10px;padding:9px 14px;font-size:13.5px;min-width:220px;}
   button{background:var(--primary);color:#fff;border:none;border-radius:10px;padding:9px 16px;font-size:13.5px;font-weight:600;cursor:pointer;white-space:nowrap;}
