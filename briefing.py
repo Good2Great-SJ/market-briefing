@@ -316,6 +316,12 @@ def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None)
     flows = analytics.stock_investor_flows(U.KR_STOCKS)
     rs = analytics.sector_rs_ranking(yf_data, U.SECTORS + U.SEMI + U.GLOBAL)
 
+    print("· 연준 금리 결정 확률 (Polymarket)…")
+    try:
+        fed_odds = analytics.fed_rate_odds()
+    except Exception as e:
+        print("  ! 실패:", e); fed_odds = None
+
     # 장단기 금리차
     spread = np.nan
     if U.YIELD_LONG in yf_data and U.YIELD_SHORT in yf_data:
@@ -373,7 +379,8 @@ def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None)
     outputs = []
     for th in theme_list:
         html = render(session, ref_str, now_kst, yf_data, kr_idx, kr_stk, money,
-                      charts_us, charts_kr, summary, mc, breadth, flows, narr, th, rs, src, credit_interp)
+                      charts_us, charts_kr, summary, mc, breadth, flows, narr, th, rs, src, credit_interp,
+                      fed_odds)
         base = f"out/briefing_{session}_{th}_{ref_str.replace('-','')}"
         fn = base + ".html"
         with open(fn, "w", encoding="utf-8") as f:
@@ -387,7 +394,14 @@ def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None)
                 print("· PDF :", pdf)
             except Exception as e:
                 print("  ! PDF 실패:", repr(e)[:150])
-        outputs.append((th, fn, pdf))
+        report_url = viewer_url = None
+        try:
+            import pages
+            report_url, viewer_url = pages.publish_report(session, th, ref_str, fn)
+            print("· Pages:", viewer_url)
+        except Exception as e:
+            print("  ! GitHub Pages 발행 실패:", repr(e)[:150])
+        outputs.append((th, fn, pdf, report_url, viewer_url))
     return dict(session=session, ref=ref_str, narr=narr, summary=summary,
                 mc=mc, outputs=outputs)
 
@@ -428,7 +442,7 @@ def build_digest(session, yf_data, kr_idx, mc, money, summary, breadth):
 # ══════════════════════════════════════════════════════════════
 def render(session, ref, now, yf_data, kr_idx, kr_stk, money,
            charts_us, charts_kr, summary, mc, breadth, flows, narr, theme="coinbase", rs=None, src=None,
-           credit_interp=None):
+           credit_interp=None, fed_odds=None):
     css = themes.get_css(theme, CSS)
     kr_all = {**kr_idx, **kr_stk}
     title = "미국 증시 마감 브리핑" if session == "us" else "한국 증시 마감 브리핑"
@@ -511,6 +525,7 @@ def render(session, ref, now, yf_data, kr_idx, kr_stk, money,
     # ── 섹션 딕셔너리 ──
     S = {
         "macro":   section("Macro", "매크로 대시보드", "금리 · 유가 · 환율 · 변동성 · 장단기차", macro_html),
+        "fed":     section("Fed Watch", "연준 금리 결정 확률", "Polymarket 예측시장 실시간 오즈", render_fed_odds(fed_odds)),
         "us_idx":  section("US Index", "미국 4대 지수", "지수 위치 & 이평선 배열", scan_table(U.US_INDICES, yf_data, compute)),
         "global":  section("Global", "글로벌 지수", "유로존 · 신흥국 · 중국 · 한국 · 일본 · 대만", scan_table(U.GLOBAL, yf_data, compute)),
         "semi":    section("Semiconductor", "반도체", "시장의 중심 섹터", scan_table(U.SEMI, yf_data, compute)),
@@ -522,9 +537,9 @@ def render(session, ref, now, yf_data, kr_idx, kr_stk, money,
         "chart_kr": section("Charts · KR", "주요 차트 (한국)", "종가 + MA10 / 50 / 200", chart_grid(charts_kr)),
     }
     if session == "us":
-        order = ["macro", "us_idx", "global", "semi", "sectors", "rs", "m7", "chart_us", "kr", "chart_kr"]
+        order = ["macro", "fed", "us_idx", "global", "semi", "sectors", "rs", "m7", "chart_us", "kr", "chart_kr"]
     else:
-        order = ["kr", "chart_kr", "macro", "us_idx", "semi", "sectors", "rs", "m7", "global", "chart_us"]
+        order = ["kr", "chart_kr", "macro", "fed", "us_idx", "semi", "sectors", "rs", "m7", "global", "chart_us"]
     body_sections = "".join(S[k] for k in order)
 
     # ── 히어로 스탯 카드 ──
@@ -636,6 +651,27 @@ def _paragraphs(text):
         return "<p></p>"
     parts = [p.strip() for p in text.split("\n") if p.strip()]
     return "".join(f"<p>{p}</p>" for p in parts) or f"<p>{text}</p>"
+
+
+def render_fed_odds(fed):
+    if not fed or not fed.get("buckets"):
+        return '<div class="fed-card mut" style="font-size:13px">Polymarket 데이터를 가져오지 못했습니다.</div>'
+    end_date = (fed.get("end_date") or "")[:10]
+    top_label = fed["buckets"][0]["label"]
+    rows = ""
+    for b in fed["buckets"]:
+        pct = b["prob"] * 100
+        cls = " fed-top" if b["label"] == top_label else ""
+        rows += (f'<div class="fed-row{cls}"><div class="fed-label">{b["label"]}</div>'
+                 f'<div class="fed-bar"><div class="fed-fill" style="width:{pct:.1f}%"></div></div>'
+                 f'<div class="fed-pct num">{pct:.1f}%</div></div>')
+    src_url = fed.get("source_url", "")
+    return f'''<div class="fed-card">
+      <div class="fed-h">{fed.get("title","")} <span class="mut" style="font-weight:400">(회의일 {end_date} 기준)</span></div>
+      {rows}
+      <div class="mut" style="font-size:11px;margin-top:10px">출처: <a href="{src_url}" target="_blank" rel="noopener">Polymarket 예측시장</a>
+      · 실시간 베팅 오즈 기반 확률이며 확정된 결과가 아닙니다.</div>
+    </div>'''
 
 
 def render_mcap(mc):
@@ -832,6 +868,16 @@ border-radius:100px;padding:4px 12px;margin-bottom:10px;}
 .credit-fill{height:100%;background:var(--primary);border-radius:100px;opacity:.35;}
 .credit-marker{position:absolute;top:-3px;width:3px;height:14px;background:var(--primary);border-radius:2px;transform:translateX(-1px);}
 .credit-scale{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:5px;}
+
+.fed-card{background:var(--card);border:1px solid var(--hair);border-radius:20px;padding:20px 22px;margin-bottom:16px;}
+.fed-h{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:14px;}
+.fed-row{display:grid;grid-template-columns:120px 1fr 56px;align-items:center;gap:12px;padding:6px 0;}
+.fed-label{font-size:13px;color:var(--body);}
+.fed-bar{position:relative;height:8px;background:var(--strong);border-radius:100px;overflow:hidden;}
+.fed-fill{height:100%;background:var(--muted);border-radius:100px;}
+.fed-row.fed-top .fed-fill{background:var(--primary);}
+.fed-row.fed-top .fed-label{font-weight:600;color:var(--ink);}
+.fed-pct{font-size:13px;text-align:right;color:var(--ink);}
 
 .table-card{background:var(--card);border:1px solid var(--hair);border-radius:20px;overflow-x:auto;margin-bottom:8px;}
 table.scan{width:100%;border-collapse:collapse;font-size:13.5px;}
