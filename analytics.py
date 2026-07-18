@@ -233,10 +233,11 @@ def stock_investor_flows(stocks):
 _FED_TITLE_RE = None  # 지연 컴파일(모듈 임포트 시 re 의존 최소화)
 
 
-def fed_rate_odds():
+def fed_rate_odds(max_meetings=4):
     """
-    Polymarket(예측시장)에서 다음 FOMC 회의의 금리 결정 확률을 가져온다.
-    인증 불필요(공개 Gamma API). 실패 시 None(리포트에서 해당 섹션 생략).
+    Polymarket(예측시장)에서 앞으로 예정된 FOMC 회의들의 금리 결정 확률을
+    회의일 순으로 모두 가져온다(가장 가까운 회의가 [0]). 인증 불필요(공개
+    Gamma API). 실패 시 None(리포트에서 해당 섹션 생략).
     """
     import re, json, requests
     global _FED_TITLE_RE
@@ -258,25 +259,26 @@ def fed_rate_odds():
     if not candidates:
         return None
     candidates.sort(key=lambda e: e.get("endDate") or "9999")
-    ev = candidates[0]
 
-    buckets = []
-    for m in ev.get("markets", []):
-        try:
-            prices = json.loads(m.get("outcomePrices") or "[]")
-            yes_prob = float(prices[0])
-        except Exception:
+    meetings = []
+    for ev in candidates[:max_meetings]:
+        buckets = []
+        for m in ev.get("markets", []):
+            try:
+                prices = json.loads(m.get("outcomePrices") or "[]")
+                yes_prob = float(prices[0])
+            except Exception:
+                continue
+            label = m.get("groupItemTitle") or m.get("question") or ""
+            buckets.append(dict(label=label, prob=yes_prob))
+        if not buckets:
             continue
-        label = m.get("groupItemTitle") or m.get("question") or ""
-        buckets.append(dict(label=label, prob=yes_prob))
-    if not buckets:
-        return None
-    buckets.sort(key=lambda b: -b["prob"])
-
-    return dict(
-        title=ev.get("title") or "",
-        end_date=ev.get("endDate") or "",
-        buckets=buckets,
-        source="Polymarket",
-        source_url=f"https://polymarket.com/event/{ev.get('slug','')}",
-    )
+        buckets.sort(key=lambda b: -b["prob"])
+        meetings.append(dict(
+            title=ev.get("title") or "",
+            end_date=ev.get("endDate") or "",
+            buckets=buckets,
+            source="Polymarket",
+            source_url=f"https://polymarket.com/event/{ev.get('slug','')}",
+        ))
+    return meetings or None
