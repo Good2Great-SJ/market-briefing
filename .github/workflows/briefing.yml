@@ -25,11 +25,14 @@ jobs:
 
       # 버터대디/증시각도기 최신 수집 상태(state.db)를 읽기 위해 sibling으로 체크아웃.
       # sources.py는 ../naver-blog-kakao-notifier/state.db 경로를 참조한다.
+      # 이 저장소는 Private이라 기본 GITHUB_TOKEN(자기 저장소 전용)으로는 접근이 안 되고,
+      # 해당 저장소를 읽을 수 있는 개인 액세스 토큰(NOTIFIER_REPO_TOKEN)이 필요하다.
       - name: Checkout naver-blog-kakao-notifier (최신 state.db)
         uses: actions/checkout@v4
         with:
           repository: Good2Great-SJ/naver-blog-kakao-notifier
           path: naver-blog-kakao-notifier
+          token: ${{ secrets.NOTIFIER_REPO_TOKEN }}
 
       - uses: actions/setup-python@v5
         with:
