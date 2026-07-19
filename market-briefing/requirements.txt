@@ -7,3 +7,5 @@ matplotlib>=3.8.0
 yfinance>=0.2.40
 finance-datareader>=0.9.90
 playwright>=1.45.0
+holidays>=0.60
+pandas_market_calendars>=4.4.0

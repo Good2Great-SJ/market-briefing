@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 자동화 트리거 체커.
-  · 미국 증시 마감 체크윈도우 : 싱가폴 07:00 ~ 12:00 (버퍼 후 폴링)
-  · 한국 증시 마감 체크윈도우 : 싱가폴 17:00 ~ 23:00 (버퍼 후 폴링)
+  · 미국 증시 마감 체크윈도우 : 싱가폴 07:00 ~ 08:30 (하드스톱 08:30)
+  · 한국 증시 마감 체크윈도우 : 싱가폴 17:00 ~ 18:00 (하드스톱 18:00)
   각 윈도우 동안 버터대디/증시각도기의 오늘자 콘텐츠가 하나라도 확인되면 즉시
   해당 세션의 briefing.build()를 실행한다. 윈도우 종료(hard stop)까지 아무것도
-  안 뜨면 그래도 한 번은 생성한다(원천 없이 규칙/웹서치 기반 총평으로 대체).
+  안 뜨면 — 그날이 휴장일(주말/공휴일)이 아닌 한 — 원천 없이 규칙 기반 총평으로
+  대체해서라도 한 번은 생성한다. 휴장일이면 애초에 소스가 없는 게 정상이므로
+  부실한 리포트를 보내지 않고 그냥 건너뛴다.
   하루 세션당 1회만 실행되도록 트리거 마커 파일로 중복 실행을 막는다.
 
 GitHub Actions에서 5~15분 간격 cron으로 이 스크립트만 반복 실행하면 된다.
@@ -27,8 +29,8 @@ MARKER_DIR = os.path.join(os.path.dirname(__file__), "out", ".triggers")
 
 # (세션, 윈도우 시작 SGT 시각, 하드스톱 SGT 시각)
 WINDOWS = {
-    "us": (datetime.time(7, 0), datetime.time(12, 0)),
-    "kr": (datetime.time(17, 0), datetime.time(23, 0)),
+    "us": (datetime.time(7, 0), datetime.time(8, 30)),
+    "kr": (datetime.time(17, 0), datetime.time(18, 0)),
 }
 
 
@@ -69,6 +71,17 @@ def check_and_run(now_sgt=None, dry_run=False):
         if not (has_source or is_hardstop):
             print(f"[{session}] 대기 중 — 원천 콘텐츠 아직 없음 (윈도우 {start}~{hardstop}, 현재 {t})")
             continue
+
+        if not has_source and is_hardstop:
+            import calendars
+            market_date = today_kst if session == "kr" else today_kst - datetime.timedelta(days=1)
+            is_holiday = (calendars.is_kr_market_holiday(market_date) if session == "kr"
+                          else calendars.is_us_market_holiday(market_date))
+            if is_holiday:
+                print(f"[{session}] 건너뜀 — {market_date} 휴장일(주말/공휴일)이라 소스도 없음, 발송 생략")
+                if not dry_run:
+                    _mark_done(session, date_str, "holiday_skip")
+                continue
 
         reason = "source_ready" if has_source else "hardstop_fallback"
         print(f"[{session}] 트리거 발동 (사유: {reason}) — 브리핑 생성 시작")
