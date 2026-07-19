@@ -85,13 +85,29 @@ function showReport(r){
   history.replaceState(null, "", url);
 }
 
+function monthKey(dateStr){
+  const [y, m] = dateStr.split("-");
+  return `${y}년 ${parseInt(m, 10)}월`;
+}
+
 function populate(){
   picker.innerHTML = "";
+  const groups = new Map();
   manifest.forEach((r, i) => {
-    const opt = document.createElement("option");
-    opt.value = i;
-    opt.textContent = label(r);
-    picker.appendChild(opt);
+    const key = monthKey(r.date);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(i);
+  });
+  groups.forEach((indices, key) => {
+    const og = document.createElement("optgroup");
+    og.label = key;
+    indices.forEach(i => {
+      const opt = document.createElement("option");
+      opt.value = i;
+      opt.textContent = label(manifest[i]);
+      og.appendChild(opt);
+    });
+    picker.appendChild(og);
   });
 }
 

@@ -258,10 +258,23 @@ def scan_table(rows_meta, data, compute_fn):
             f'<tbody>{"".join(body)}</tbody></table></div>')
 
 
-def section(eyebrow, title, sub, inner):
-    return (f'<section><div class="eyebrow"><span class="badge">{eyebrow}</span>'
+def section(key, eyebrow, title, sub, inner):
+    return (f'<section id="{key}"><div class="eyebrow"><span class="badge">{eyebrow}</span>'
             f'<span class="sub">{sub}</span></div>'
             f'<h2>{title}</h2>{inner}</section>')
+
+
+_NAV_LABELS = {
+    "narr": "총평", "sources": "소스", "macro": "매크로", "fed": "Fed",
+    "us_idx": "미국지수", "global": "글로벌", "semi": "반도체", "sectors": "섹터",
+    "rs": "RS랭킹", "m7": "M7·AI", "chart_us": "차트(US)",
+    "kr": "한국시장", "chart_kr": "차트(KR)",
+}
+
+
+def render_nav(keys):
+    chips = "".join(f'<a class="nav-chip" href="#{k}">{_NAV_LABELS.get(k, k)}</a>' for k in keys)
+    return f'<div class="nav-bar">{chips}</div>'
 
 
 def chart_grid(charts):
@@ -545,23 +558,25 @@ def render(session, ref, now, yf_data, kr_idx, kr_stk, money,
 
     # ── 섹션 딕셔너리 ──
     S = {
-        "macro":   section("Macro", "매크로 대시보드", "금리 · 유가 · 환율 · 변동성 · 장단기차", macro_html),
-        "fed":     section("Fed Watch", "연준 금리 결정 확률", "Polymarket 예측시장 실시간 오즈", render_fed_odds(fed_odds)),
-        "us_idx":  section("US Index", "미국 4대 지수", "지수 위치 & 이평선 배열", scan_table(U.US_INDICES, yf_data, compute)),
-        "global":  section("Global", "글로벌 지수", "유로존 · 신흥국 · 중국 · 한국 · 일본 · 대만", scan_table(U.GLOBAL, yf_data, compute)),
-        "semi":    section("Semiconductor", "반도체", "시장의 중심 섹터", scan_table(U.SEMI, yf_data, compute)),
-        "sectors": section("Sector Rotation", "섹터 로테이션", "원전 · 전력 · 로봇 · 바이오 · 방산 · 신재생 등", scan_table(U.SECTORS, yf_data, compute)),
-        "rs": section("Relative Strength", "섹터 상대강도(RS) 랭킹", f"S&P500 대비 최근 {rs['lookback']}거래일 초과수익률", render_rs(rs)) if rs else "",
-        "m7":      section("Megacap · AI", "M7 · AI 밸류체인", "빅테크 개별 & 데이터센터 체인", scan_table(U.M7 + U.AI_CHAIN, yf_data, compute)),
-        "chart_us": section("Charts · US", "주요 차트 (미국)", "종가 + MA10 / 50 / 200", chart_grid(charts_us)),
-        "kr":      section("KR Market", "한국 시장", "지수 · 시총 수준 · 예탁금 · 신용잔고 · 관심종목", kr_block),
-        "chart_kr": section("Charts · KR", "주요 차트 (한국)", "종가 + MA10 / 50 / 200", chart_grid(charts_kr)),
+        "macro":   section("macro", "Macro", "매크로 대시보드", "금리 · 유가 · 환율 · 변동성 · 장단기차", macro_html),
+        "fed":     section("fed", "Fed Watch", "연준 금리 결정 확률", "Polymarket 예측시장 실시간 오즈", render_fed_odds(fed_odds)),
+        "us_idx":  section("us_idx", "US Index", "미국 4대 지수", "지수 위치 & 이평선 배열", scan_table(U.US_INDICES, yf_data, compute)),
+        "global":  section("global", "Global", "글로벌 지수", "유로존 · 신흥국 · 중국 · 한국 · 일본 · 대만", scan_table(U.GLOBAL, yf_data, compute)),
+        "semi":    section("semi", "Semiconductor", "반도체", "시장의 중심 섹터", scan_table(U.SEMI, yf_data, compute)),
+        "sectors": section("sectors", "Sector Rotation", "섹터 로테이션", "원전 · 전력 · 로봇 · 바이오 · 방산 · 신재생 등", scan_table(U.SECTORS, yf_data, compute)),
+        "rs": section("rs", "Relative Strength", "섹터 상대강도(RS) 랭킹", f"S&P500 대비 최근 {rs['lookback']}거래일 초과수익률", render_rs(rs)) if rs else "",
+        "m7":      section("m7", "Megacap · AI", "M7 · AI 밸류체인", "빅테크 개별 & 데이터센터 체인", scan_table(U.M7 + U.AI_CHAIN, yf_data, compute)),
+        "chart_us": section("chart_us", "Charts · US", "주요 차트 (미국)", "종가 + MA10 / 50 / 200", chart_grid(charts_us)),
+        "kr":      section("kr", "KR Market", "한국 시장", "지수 · 시총 수준 · 예탁금 · 신용잔고 · 관심종목", kr_block),
+        "chart_kr": section("chart_kr", "Charts · KR", "주요 차트 (한국)", "종가 + MA10 / 50 / 200", chart_grid(charts_kr)),
     }
     if session == "us":
         order = ["macro", "fed", "us_idx", "global", "semi", "sectors", "rs", "m7", "chart_us", "kr", "chart_kr"]
     else:
         order = ["kr", "chart_kr", "macro", "fed", "us_idx", "semi", "sectors", "rs", "m7", "global", "chart_us"]
     body_sections = "".join(S[k] for k in order)
+    nav_keys = ["narr"] + (["sources"] if source_list_html else []) + [k for k in order if S[k]]
+    nav_html = render_nav(nav_keys)
 
     # ── 히어로 스탯 카드 ──
     b50 = f"{breadth['pct50']:.0f}%" if breadth else "–"
@@ -592,6 +607,8 @@ def render(session, ref, now, yf_data, kr_idx, kr_stk, money,
   </div>
 </div>
 
+{nav_html}
+
 <div class="wrap">
   {narr_html}
   {source_list_html}
@@ -620,7 +637,7 @@ def render_narrative(narr, summary, src=None):
               f"신저가 근접: {', '.join(summary['lo']) or '없음'}.")
         note = ('버터대디·증시각도기의 오늘자 콘텐츠가 아직 확인되지 않아 데이터 기반 규칙 요약으로 대체했습니다.'
                 if not src_badges else '')
-        return (f'<section class="brief"><div class="eyebrow"><span class="badge badge-key">Briefing</span>'
+        return (f'<section class="brief" id="narr"><div class="eyebrow"><span class="badge badge-key">Briefing</span>'
                 f'<span class="sub">규칙 기반 요약</span></div>'
                 f'<h2>오늘의 총평</h2><div class="ov-card"><p>{ov}</p>'
                 f'{f"<p class=mut style=margin-top:10px;font-size:12.5px>{note}</p>" if note else ""}</div></section>')
@@ -654,7 +671,7 @@ def render_narrative(narr, summary, src=None):
     else:
         ov_cards = f'<div class="ov-card">{_paragraphs(narr.get("overview", ""))}</div>'
 
-    return f'''<section class="brief">
+    return f'''<section class="brief" id="narr">
       <div class="eyebrow"><span class="badge badge-key">Briefing</span><span class="sub">근거 · {src_label}</span>
       {f'<span class="src-badges">{src_badges}</span>' if src_badges else ''}</div>
       <h2>오늘의 총평</h2>
@@ -724,7 +741,7 @@ def render_source_list(src_list):
       btn.textContent = showing ? "더보기 ▾" : "접기 ▴";
     }
     </script>'''
-    return f'''<section class="brief">
+    return f'''<section class="brief" id="sources">
       <div class="eyebrow"><span class="badge">Sources</span><span class="sub">수집된 원문 글·영상</span></div>
       <h2>주요 블로그 및 영상</h2>
       <div class="srcl-card">{rows}</div>
@@ -912,8 +929,16 @@ font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;}
 .scard .sv{font-size:26px;font-weight:500;letter-spacing:-.5px;}
 .scard .sc{font-size:12.5px;margin-top:5px;}
 
+html{scroll-behavior:smooth;}
+.nav-bar{position:sticky;top:0;z-index:30;background:var(--canvas);border-bottom:1px solid var(--hair);
+padding:10px 24px;display:flex;gap:8px;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;}
+.nav-bar::-webkit-scrollbar{display:none;}
+.nav-chip{flex:0 0 auto;font-size:12.5px;font-weight:600;color:var(--body);background:var(--strong);
+border-radius:100px;padding:6px 14px;text-decoration:none;}
+.nav-chip:hover{color:var(--primary);}
+
 .wrap{max-width:1120px;margin:0 auto;padding:8px 24px 72px;}
-section{margin-top:46px;}
+section{margin-top:46px;scroll-margin-top:60px;}
 .eyebrow{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
 .badge{display:inline-block;font-size:11.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;
 background:var(--strong);color:var(--ink);border-radius:100px;padding:5px 13px;}
