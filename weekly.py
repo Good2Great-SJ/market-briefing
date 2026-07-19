@@ -142,6 +142,102 @@ def build_email_body(start, end, items, digest, counted_keywords):
     return "\n".join(lines)
 
 
+_HTML_UP = "#cf202f"
+_HTML_DN = "#0066cc"
+_HTML_PRIMARY = "#1652f0"
+_HTML_INK = "#0a0b0d"
+_HTML_MUTED = "#6b7280"
+_HTML_SOFT = "#f4f5f7"
+_HTML_HAIR = "#e7e9ec"
+
+
+def build_email_html(start, end, items, digest, counted_keywords):
+    by_source = {}
+    for it in items:
+        by_source[it["source"]] = by_source.get(it["source"], 0) + 1
+    src_breakdown = " · ".join(f"{k} {v}건" for k, v in sorted(by_source.items(), key=lambda x: -x[1]))
+
+    max_cnt = max((c for _, c in counted_keywords[:10]), default=1)
+    kw_rows = ""
+    for i, (kw, cnt) in enumerate(counted_keywords[:10], 1):
+        pct = max(int(cnt / max_cnt * 100), 6)
+        kw_rows += f'''
+        <tr>
+          <td style="padding:9px 0;font-size:13px;color:{_HTML_MUTED};width:22px;font-weight:600;">{i}</td>
+          <td style="padding:9px 0;font-size:14px;color:{_HTML_INK};font-weight:600;">{kw}</td>
+          <td style="padding:9px 0;">
+            <div style="background:{_HTML_HAIR};border-radius:100px;height:6px;width:160px;">
+              <div style="background:{_HTML_PRIMARY};border-radius:100px;height:6px;width:{pct}%;"></div>
+            </div>
+          </td>
+          <td style="padding:9px 0 9px 12px;font-size:12.5px;color:{_HTML_MUTED};white-space:nowrap;text-align:right;">{cnt}건</td>
+        </tr>'''
+    keywords_html = ""
+    if kw_rows:
+        keywords_html = f'''
+        <tr><td style="padding:28px 28px 6px;">
+          <div style="font-size:12px;font-weight:700;letter-spacing:.06em;color:{_HTML_PRIMARY};text-transform:uppercase;margin-bottom:12px;">이번 주 핵심 키워드</div>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tbody>{kw_rows}</tbody></table>
+        </td></tr>'''
+
+    events = (digest or {}).get("events") or []
+    ev_rows = ""
+    for ev in events:
+        ev_rows += f'''
+        <div style="padding:12px 0;border-bottom:1px solid {_HTML_HAIR};">
+          <div style="font-size:12px;font-family:monospace,monospace;color:{_HTML_PRIMARY};font-weight:700;margin-bottom:3px;">{ev.get('date','')}</div>
+          <div style="font-size:14px;color:{_HTML_INK};font-weight:600;line-height:1.5;">{ev.get('title','')}</div>
+          <div style="font-size:13px;color:{_HTML_MUTED};margin-top:2px;line-height:1.5;">{ev.get('impact','')}</div>
+        </div>'''
+    events_html = ""
+    if ev_rows:
+        events_html = f'''
+        <tr><td style="padding:28px 28px 6px;">
+          <div style="font-size:12px;font-weight:700;letter-spacing:.06em;color:{_HTML_PRIMARY};text-transform:uppercase;margin-bottom:8px;">주요 이벤트</div>
+          <div>{ev_rows}</div>
+        </td></tr>'''
+
+    summary = ((digest or {}).get("week_summary") or "").strip()
+    para_lines = [p.strip() for p in summary.split("\n") if p.strip()]
+    summary_html = ""
+    if para_lines:
+        body_paras = "".join(
+            f'<p style="margin:0 0 14px;font-size:14.5px;line-height:1.75;color:#1f2328;">{p}</p>'
+            for p in para_lines[:-1])
+        concl = (f'<p style="margin:14px 0 0;padding-top:14px;border-top:1px solid {_HTML_HAIR};'
+                 f'font-size:14.5px;line-height:1.75;color:{_HTML_INK};font-weight:600;">{para_lines[-1]}</p>')
+        summary_html = f'''
+        <tr><td style="padding:28px 28px 6px;">
+          <div style="font-size:12px;font-weight:700;letter-spacing:.06em;color:{_HTML_PRIMARY};text-transform:uppercase;margin-bottom:12px;">한 주 총평</div>
+          <div style="background:{_HTML_SOFT};border-radius:14px;padding:20px 22px;">{body_paras}{concl}</div>
+        </td></tr>'''
+
+    return f'''<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#eef0f3;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Pretendard,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef0f3;padding:28px 12px;">
+<tr><td align="center">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:20px;overflow:hidden;">
+  <tr><td style="background:{_HTML_INK};padding:30px 28px;">
+    <div style="font-size:11.5px;font-weight:700;letter-spacing:.08em;color:#8b93a0;text-transform:uppercase;margin-bottom:8px;">Weekly Digest</div>
+    <div style="font-size:22px;font-weight:700;color:#ffffff;">주간 증시 브리핑</div>
+    <div style="font-size:13px;color:#9aa3b0;margin-top:6px;">{start.isoformat()} ~ {end.isoformat()}</div>
+  </td></tr>
+  {keywords_html}
+  {events_html}
+  {summary_html}
+  <tr><td style="padding:22px 28px 28px;">
+    <div style="border-top:1px solid {_HTML_HAIR};padding-top:16px;font-size:12px;color:{_HTML_MUTED};line-height:1.6;">
+      수집 원문 총 {len(items)}건 · {src_breakdown}<br>
+      이 다이제스트는 원문을 종합한 AI 생성 요약이며, 키워드 등장 횟수는 원문에서 실제로 재검증한 값입니다.
+    </div>
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>'''
+
+
 def _marker_path(week_id):
     return os.path.join(MARKER_DIR, f"weekly_{week_id}.done")
 
@@ -166,18 +262,19 @@ def run(now_sgt=None, dry_run=False):
     digest = generate_digest(items, monday, friday)
     counted = _verify_keyword_counts((digest or {}).get("keywords"), items)
     body = build_email_body(monday, friday, items, digest, counted)
+    html = build_email_html(monday, friday, items, digest, counted)
     subject = f"[주간 증시 브리핑] {monday.isoformat()} ~ {friday.isoformat()} 핵심 키워드 & 이벤트"
 
     if dry_run:
         print(body)
-        return dict(subject=subject, body=body)
+        return dict(subject=subject, body=body, html=html)
 
     os.makedirs(MARKER_DIR, exist_ok=True)
     with open(_marker_path(week_id), "w", encoding="utf-8") as f:
         json.dump({"at": now_sgt.isoformat()}, f, ensure_ascii=False)
 
     import delivery
-    res = delivery.send_email(subject, body, [])
+    res = delivery.send_email(subject, body, [], html_body=html)
     print("  → 이메일 발송 완료:", res)
     return res
 

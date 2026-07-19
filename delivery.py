@@ -69,13 +69,15 @@ def build_email_body(session, ref, narr, summary, mc, link_url=""):
     return "\n".join(lines)
 
 
-def send_email(subject, body_text, pdf_paths, to_addr=None):
+def send_email(subject, body_text, pdf_paths, to_addr=None, html_body=None):
     """
     PDF를 첨부해 이메일로 발송한다. .env에 아래 값이 필요:
       EMAIL_SMTP_HOST (기본 smtp.gmail.com), EMAIL_SMTP_PORT (기본 587)
       EMAIL_SENDER, EMAIL_APP_PASSWORD, EMAIL_RECEIVER
     Gmail 기준 EMAIL_APP_PASSWORD는 일반 비밀번호가 아닌 앱 비밀번호
     (myaccount.google.com/apppasswords)가 필요하다.
+    html_body를 주면 HTML 버전을 함께 넣는다(구버전 클라이언트용 body_text는
+    항상 폴백으로 포함).
     """
     import smtplib
     from email.message import EmailMessage
@@ -97,6 +99,8 @@ def send_email(subject, body_text, pdf_paths, to_addr=None):
     msg["From"] = sender
     msg["To"] = receiver
     msg.set_content(body_text)
+    if html_body:
+        msg.add_alternative(html_body, subtype="html")
 
     for p in pdf_paths:
         p = pathlib.Path(p)
