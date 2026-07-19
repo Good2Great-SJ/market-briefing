@@ -21,6 +21,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+from matplotlib.patches import Rectangle
 
 import universe as U
 import analytics
@@ -49,8 +50,8 @@ def fetch_yf(tickers):
     out = {}
     for t in syms:
         try:
-            df = pd.DataFrame({"Close": raw["Close"][t], "High": raw["High"][t],
-                               "Low": raw["Low"][t]}).dropna()
+            df = pd.DataFrame({"Close": raw["Close"][t], "Open": raw["Open"][t],
+                               "High": raw["High"][t], "Low": raw["Low"][t]}).dropna()
             if len(df) >= 30:
                 out[t] = df
         except Exception:
@@ -65,7 +66,7 @@ def fetch_fdr(items):
     for code, _ in items:
         try:
             df = fdr.DataReader(code, start)
-            keep = {"Close": df["Close"], "High": df["High"], "Low": df["Low"]}
+            keep = {"Close": df["Close"], "Open": df["Open"], "High": df["High"], "Low": df["Low"]}
             if "Amount" in df.columns:
                 keep["Amount"] = df["Amount"]
             out[code] = pd.DataFrame(keep).dropna(subset=["Close"])
@@ -131,18 +132,36 @@ def compute(df):
 # ══════════════════════════════════════════════════════════════
 # 3. 차트 (Coinbase 팔레트)
 # ══════════════════════════════════════════════════════════════
+_CANDLE_UP = "#cf202f"    # 상승(양봉) — 사이트 전체 --up 색상과 통일
+_CANDLE_DN = "#0066cc"    # 하락(음봉) — 사이트 전체 --dn 색상과 통일
+
+
 def chart_b64(df, name, n=130):
+    o = df["Open"].astype(float).tail(n)
+    h = df["High"].astype(float).tail(n)
+    l = df["Low"].astype(float).tail(n)
     c = df["Close"].astype(float).tail(n)
     idx = c.index
+    x = mdates.date2num(idx.to_pydatetime())
+    width = (x[-1] - x[0]) / max(len(x), 1) * 0.62 if len(x) > 1 else 0.6
+
     fig, ax = plt.subplots(figsize=(4.7, 2.3), dpi=115)
     fig.patch.set_facecolor("#fff"); ax.set_facecolor("#fff")
-    ax.plot(idx, c, color="#0a0b0d", lw=1.8, label="종가", zorder=5)
-    for p, col in ((10, "#7c828a"), (50, "#0052ff"), (200, "#cf202f")):
+    for xi, oi, hi, li, ci in zip(x, o, h, l, c):
+        color = _CANDLE_UP if ci >= oi else _CANDLE_DN
+        ax.plot([xi, xi], [li, hi], color=color, lw=.6, zorder=3, solid_capstyle="round")
+        lower, height = min(oi, ci), abs(ci - oi)
+        if height == 0:
+            height = hi * 0.0008  # 도지(시가=종가)도 얇은 선으로 보이게
+        ax.add_patch(Rectangle((xi - width / 2, lower), width, height,
+                                facecolor=color, edgecolor=color, lw=0, zorder=4))
+    for p, col in ((10, "#7c828a"), (50, "#0052ff"), (200, "#8a5a00")):
         full = df["Close"].astype(float).rolling(p).mean().tail(n)
         if full.notna().any():
-            ax.plot(idx, full, color=col, lw=1.1, alpha=.95, label=f"MA{p}")
+            ax.plot(idx, full, color=col, lw=1.1, alpha=.95, label=f"MA{p}", zorder=5)
+    ax.xaxis_date()
     ax.set_title(name, fontsize=11, fontweight="600", color="#0a0b0d", pad=6, loc="left")
-    ax.legend(fontsize=6.6, loc="upper left", frameon=False, ncol=4,
+    ax.legend(fontsize=6.6, loc="upper left", frameon=False, ncol=3,
               handlelength=1.1, columnspacing=.9, labelcolor="#7c828a")
     ax.grid(True, axis="y", alpha=1, lw=.7, color="#eef0f3")
     ax.tick_params(labelsize=6.8, colors="#7c828a", length=0)
@@ -665,24 +684,51 @@ def render_source_list(src_list):
     if not src_list:
         return ""
     rows = ""
-    for it in src_list:
-        summary = it.get("summary") or ""
-        summary_html = (f'<p class="srcl-summary">{summary}</p>' if summary
-                         else '<p class="srcl-summary mut">요약 준비 중입니다.</p>')
+    for i, it in enumerate(src_list):
+        summary = (it.get("summary") or "").strip()
+        lines = [ln.strip() for ln in summary.split("\n") if ln.strip()]
+        if not lines:
+            rows += f'''<div class="srcl-row">
+              <div class="srcl-head">
+                <span class="srcl-badge">{it["source"]}</span>
+                <span class="srcl-title">{it["title"]}</span>
+                <span class="srcl-date mut">{it["date"]}</span>
+              </div>
+              <p class="srcl-summary mut">요약 준비 중입니다.</p>
+              <div class="srcl-actions"><a class="srcl-link" href="{it["url"]}" target="_blank" rel="noopener">원문 보기 ↗</a></div>
+            </div>'''
+            continue
+        preview = lines[0]
+        rest = lines[1:]
+        rest_html = "".join(f"<p>{ln}</p>" for ln in rest)
+        toggle_btn = (f'<button type="button" class="srcl-toggle" onclick="srclToggle(this,{i})">더보기 ▾</button>'
+                      if rest else "")
         rows += f'''<div class="srcl-row">
           <div class="srcl-head">
             <span class="srcl-badge">{it["source"]}</span>
             <span class="srcl-title">{it["title"]}</span>
             <span class="srcl-date mut">{it["date"]}</span>
           </div>
-          {summary_html}
-          <a class="srcl-link" href="{it["url"]}" target="_blank" rel="noopener">원문 보기 ↗</a>
+          <p class="srcl-summary">{preview}</p>
+          <div class="srcl-summary-full" id="srcl-full-{i}" style="display:none">{rest_html}</div>
+          <div class="srcl-actions">
+            {toggle_btn}
+            <a class="srcl-link" href="{it["url"]}" target="_blank" rel="noopener">원문 보기 ↗</a>
+          </div>
         </div>'''
+    script = '''<script>
+    function srclToggle(btn, idx){
+      var full = document.getElementById("srcl-full-" + idx);
+      var showing = full.style.display !== "none";
+      full.style.display = showing ? "none" : "";
+      btn.textContent = showing ? "더보기 ▾" : "접기 ▴";
+    }
+    </script>'''
     return f'''<section class="brief">
       <div class="eyebrow"><span class="badge">Sources</span><span class="sub">수집된 원문 글·영상</span></div>
       <h2>주요 블로그 및 영상</h2>
       <div class="srcl-card">{rows}</div>
-    </section>'''
+    </section>{script}'''
 
 
 def render_fed_odds(fed_list):
@@ -885,7 +931,12 @@ background:var(--strong);border-radius:100px;padding:4px 11px;}
 border-radius:100px;padding:4px 10px;white-space:nowrap;}
 .srcl-title{flex:1 1 auto;font-size:13.5px;font-weight:600;color:var(--ink);line-height:1.4;min-width:0;}
 .srcl-date{flex:0 0 auto;font-size:12px;font-family:var(--mono);color:var(--muted);white-space:nowrap;}
-.srcl-summary{margin:10px 0 8px;font-size:13.5px;line-height:1.65;color:var(--body);white-space:pre-line;}
+.srcl-summary{margin:10px 0 0;font-size:13.5px;line-height:1.65;color:var(--body);white-space:pre-line;}
+.srcl-summary-full{font-size:13.5px;line-height:1.65;color:var(--body);}
+.srcl-summary-full p{margin:8px 0 0;}
+.srcl-actions{display:flex;align-items:center;gap:14px;margin-top:10px;}
+.srcl-toggle{background:none;border:none;padding:0;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;}
+.srcl-toggle:hover{color:var(--primary);}
 .srcl-link{font-size:12px;font-weight:600;color:var(--primary);text-decoration:none;white-space:nowrap;}
 .srcl-link:hover{text-decoration:underline;}
 h2{font-size:29px;font-weight:400;letter-spacing:-.6px;margin:0 0 16px;color:var(--ink);}
