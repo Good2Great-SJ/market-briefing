@@ -121,6 +121,7 @@ YF_ALL = (
 CHART_TARGETS = [
     ("^GSPC", "S&P500"), ("QQQ", "QQQ"), ("SOXX", "반도체 SOXX"),
     ("MU", "마이크론"), ("AAPL", "애플"), ("NVDA", "엔비디아"),
+    ("BTC-USD", "비트코인"),
 ]
 CHART_TARGETS_KR = [
     ("KS11", "KOSPI"), ("KQ11", "KOSDAQ"),

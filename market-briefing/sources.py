@@ -186,6 +186,32 @@ def has_any(sources):
 MAX_RAW_CHARS = 8000
 
 
+def list_recent_sources(session, ref_date, monday_includes_weekend=True):
+    """
+    리포트 데이터 기준일까지 수집되어 있는 원문 글/영상 목록(최신순).
+    총평 생성에 실제로 쓰인 것 외에도, 해당 세션의 '기대 날짜'까지 올라온
+    글/영상을 전부 보여주기 위한 용도(리포트의 '수집 현황' 섹션).
+    월요일 리포트는 주말(토·일) 동안 올라온 글도 함께 포함한다.
+    """
+    want = expected_date(session, ref_date)
+    start = want
+    if monday_includes_weekend and want.weekday() == 0:  # 월요일
+        start = want - datetime.timedelta(days=2)
+
+    out = []
+    for blog_id, label in ((BUTTERDADDY_BLOG_ID, "버터대디"), (JEUNGSI_CHANNEL_ID, "증시각도기")):
+        for item in _fetch_candidates(blog_id):
+            d = _row_effective_date(item)
+            if start <= d <= want:
+                out.append(dict(
+                    source=label, title=item["title"], url=item["url"],
+                    published_at=item["published_at"], date=d.isoformat(),
+                    summary=(item.get("summary") or "").strip(),
+                ))
+    out.sort(key=lambda x: x["published_at"], reverse=True)
+    return out
+
+
 def to_prompt_block(sources):
     """
     narrative.py 프롬프트에 삽입할 원천 콘텐츠 텍스트 블록.

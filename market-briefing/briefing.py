@@ -359,6 +359,7 @@ def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None)
     src = srcmod.get_session_sources(session, ref_date)
     for k, v in src.items():
         print(f"  - {k}:", v["title"][:40] if v else "없음(미발행)")
+    src_list = srcmod.list_recent_sources(session, ref_date)
 
     # 총평 (원천 콘텐츠 우선, 없으면 웹서치)
     print("· 총평 생성…")
@@ -380,7 +381,7 @@ def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None)
     for th in theme_list:
         html = render(session, ref_str, now_kst, yf_data, kr_idx, kr_stk, money,
                       charts_us, charts_kr, summary, mc, breadth, flows, narr, th, rs, src, credit_interp,
-                      fed_odds)
+                      fed_odds, src_list)
         base = f"out/briefing_{session}_{th}_{ref_str.replace('-','')}"
         fn = base + ".html"
         with open(fn, "w", encoding="utf-8") as f:
@@ -442,7 +443,7 @@ def build_digest(session, yf_data, kr_idx, mc, money, summary, breadth):
 # ══════════════════════════════════════════════════════════════
 def render(session, ref, now, yf_data, kr_idx, kr_stk, money,
            charts_us, charts_kr, summary, mc, breadth, flows, narr, theme="coinbase", rs=None, src=None,
-           credit_interp=None, fed_odds=None):
+           credit_interp=None, fed_odds=None, src_list=None):
     css = themes.get_css(theme, CSS)
     kr_all = {**kr_idx, **kr_stk}
     title = "미국 증시 마감 브리핑" if session == "us" else "한국 증시 마감 브리핑"
@@ -466,6 +467,7 @@ def render(session, ref, now, yf_data, kr_idx, kr_stk, money,
 
     # ── 총평 섹션 ──
     narr_html = render_narrative(narr, summary, src)
+    source_list_html = render_source_list(src_list)
 
     # ── 매크로 (장단기차 카드 포함) ──
     macro_cards = []
@@ -573,6 +575,7 @@ def render(session, ref, now, yf_data, kr_idx, kr_stk, money,
 
 <div class="wrap">
   {narr_html}
+  {source_list_html}
   {body_sections}
 </div>
 
@@ -615,7 +618,7 @@ def render_narrative(narr, summary, src=None):
         f'<span class="cal-e">{c.get("event","")}</span></div>'
         for c in narr.get("calendar", []))
     news_html = news or '<div class="mut" style="font-size:13px">오늘 원천 콘텐츠에 특별히 언급된 뉴스가 없습니다.</div>'
-    cal_html = cal or '<div class="mut" style="font-size:13px">오늘 원천 콘텐츠에 언급된 일정이 없습니다.</div>'
+    cal_html = cal or '<div class="mut" style="font-size:13px">오늘 원천 콘텐츠에 언급된 체크 이벤트가 없습니다.</div>'
 
     # 버터대디/증시각도기 분석을 각각 온전한 별도 카드로 표시(합쳐서 압축하지 않음).
     # 구버전 스키마(overview 단일 필드)로 온 응답도 하위 호환 처리.
@@ -641,7 +644,7 @@ def render_narrative(narr, summary, src=None):
         <div class="bcard"><div class="bh">주요 체크포인트</div><ul class="cps">{cps}</ul></div>
         <div class="bcard"><div class="bh">시장 영향 뉴스</div>{news_html}</div>
       </div>
-      <div class="bcard cal-card"><div class="bh">다가오는 주요 일정</div><div class="cal">{cal_html}</div></div>
+      <div class="bcard cal-card"><div class="bh">체크해야 할 이벤트</div><div class="cal">{cal_html}</div></div>
     </section>'''
 
 
@@ -656,6 +659,30 @@ def _paragraphs(text):
     html = "".join(f"<p>{p}</p>" for p in parts[:-1])
     html += f'<p class="ov-concl">{parts[-1]}</p>'
     return html
+
+
+def render_source_list(src_list):
+    if not src_list:
+        return ""
+    rows = ""
+    for it in src_list:
+        summary = it.get("summary") or ""
+        summary_html = (f'<p class="srcl-summary">{summary}</p>' if summary
+                         else '<p class="srcl-summary mut">요약 준비 중입니다.</p>')
+        rows += f'''<div class="srcl-row">
+          <div class="srcl-head">
+            <span class="srcl-badge">{it["source"]}</span>
+            <span class="srcl-title">{it["title"]}</span>
+            <span class="srcl-date mut">{it["date"]}</span>
+          </div>
+          {summary_html}
+          <a class="srcl-link" href="{it["url"]}" target="_blank" rel="noopener">원문 보기 ↗</a>
+        </div>'''
+    return f'''<section class="brief">
+      <div class="eyebrow"><span class="badge">Sources</span><span class="sub">수집된 원문 글·영상</span></div>
+      <h2>주요 블로그 및 영상</h2>
+      <div class="srcl-card">{rows}</div>
+    </section>'''
 
 
 def render_fed_odds(fed_list):
@@ -850,6 +877,17 @@ background:var(--strong);color:var(--ink);border-radius:100px;padding:5px 13px;}
 .src-badge{font-size:11.5px;font-weight:600;color:var(--primary);text-decoration:none;
 background:var(--strong);border-radius:100px;padding:4px 11px;}
 .src-badge:hover{text-decoration:underline;}
+.srcl-card{background:var(--card);border:1px solid var(--hair);border-radius:20px;overflow:hidden;}
+.srcl-row{padding:18px 20px;border-bottom:1px solid var(--hairsoft);}
+.srcl-row:last-child{border-bottom:none;}
+.srcl-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.srcl-badge{flex:0 0 auto;font-size:11px;font-weight:600;color:var(--primary);background:var(--strong);
+border-radius:100px;padding:4px 10px;white-space:nowrap;}
+.srcl-title{flex:1 1 auto;font-size:13.5px;font-weight:600;color:var(--ink);line-height:1.4;min-width:0;}
+.srcl-date{flex:0 0 auto;font-size:12px;font-family:var(--mono);color:var(--muted);white-space:nowrap;}
+.srcl-summary{margin:10px 0 8px;font-size:13.5px;line-height:1.65;color:var(--body);white-space:pre-line;}
+.srcl-link{font-size:12px;font-weight:600;color:var(--primary);text-decoration:none;white-space:nowrap;}
+.srcl-link:hover{text-decoration:underline;}
 h2{font-size:29px;font-weight:400;letter-spacing:-.6px;margin:0 0 16px;color:var(--ink);}
 
 /* 총평 */
