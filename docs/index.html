@@ -76,7 +76,8 @@ function showReport(r){
   }
   frameWrap.innerHTML = "";
   const iframe = document.createElement("iframe");
-  iframe.src = r.path;
+  const bust = r.generated_at ? encodeURIComponent(r.generated_at) : Date.now();
+  iframe.src = r.path + "?v=" + bust;
   frameWrap.appendChild(iframe);
   const url = new URL(location.href);
   url.searchParams.set("session", r.session);

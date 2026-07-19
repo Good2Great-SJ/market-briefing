@@ -22,6 +22,34 @@ DB_PATH = os.path.join(NOTIFIER_DIR, "state.db")
 BUTTERDADDY_BLOG_ID = "butterdaddy"
 JEUNGSI_CHANNEL_ID = "UCdOjVxkj5JA0iDu3_xcsTyQ"  # 증시각도기 (config.yaml 기준)
 
+_SOURCE_NAMES_CACHE = None
+
+
+def _all_source_names():
+    """
+    naver-blog-kakao-notifier/config.yaml에 등록된 모든 블로그·유튜브 채널의
+    {id: 표시이름} 매핑. 총평(버터대디/증시각도기) 산출용이 아니라, '주요 블로그
+    및 영상' 목록에 수집 중인 소스 전체를 보여주기 위한 용도.
+    """
+    global _SOURCE_NAMES_CACHE
+    if _SOURCE_NAMES_CACHE is not None:
+        return _SOURCE_NAMES_CACHE
+    names = {}
+    try:
+        import yaml
+        with open(os.path.join(NOTIFIER_DIR, "config.yaml"), encoding="utf-8") as f:
+            cfg = yaml.safe_load(f) or {}
+        for b in cfg.get("blogs", []) or []:
+            if b.get("blog_id"):
+                names[b["blog_id"]] = b.get("name") or b["blog_id"]
+        for c in cfg.get("youtube_channels", []) or []:
+            if c.get("channel_id"):
+                names[c["channel_id"]] = c.get("name") or c["channel_id"]
+    except Exception:
+        pass
+    _SOURCE_NAMES_CACHE = names
+    return names
+
 KST = datetime.timezone(datetime.timedelta(hours=9))
 LOOKBACK_ROWS = 8  # 최근 N개 글/영상 중에서 기대 날짜+세션과 일치하는 것을 찾는다
 
@@ -103,7 +131,7 @@ def _matches_session(row, session):
     return lo <= hour <= hi
 
 
-def _fetch_candidates(blog_id):
+def _fetch_candidates(blog_id, limit=LOOKBACK_ROWS):
     if not os.path.exists(DB_PATH):
         return []
     conn = sqlite3.connect(DB_PATH)
@@ -111,7 +139,7 @@ def _fetch_candidates(blog_id):
     rows = conn.execute(
         "SELECT post_id, blog_id, title, url, published_at, summary, raw_content, status "
         "FROM posts WHERE blog_id = ? ORDER BY published_at DESC LIMIT ?",
-        (blog_id, LOOKBACK_ROWS),
+        (blog_id, limit),
     ).fetchall()
     conn.close()
     out = []
@@ -186,6 +214,20 @@ def has_any(sources):
 MAX_RAW_CHARS = 8000
 
 
+def _all_tracked_ids():
+    """config.yaml에 등록된 소스 + DB에 실제 존재하는 blog_id(설정 누락 대비 안전망)."""
+    names = dict(_all_source_names())
+    if os.path.exists(DB_PATH):
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            for (bid,) in conn.execute("SELECT DISTINCT blog_id FROM posts"):
+                names.setdefault(bid, bid)
+            conn.close()
+        except Exception:
+            pass
+    return names
+
+
 def list_recent_sources(session, ref_date, monday_includes_weekend=True):
     """
     리포트 데이터 기준일까지 수집되어 있는 원문 글/영상 목록(최신순).
@@ -199,7 +241,7 @@ def list_recent_sources(session, ref_date, monday_includes_weekend=True):
         start = want - datetime.timedelta(days=2)
 
     out = []
-    for blog_id, label in ((BUTTERDADDY_BLOG_ID, "버터대디"), (JEUNGSI_CHANNEL_ID, "증시각도기")):
+    for blog_id, label in _all_tracked_ids().items():
         for item in _fetch_candidates(blog_id):
             d = _row_effective_date(item)
             if start <= d <= want:
@@ -209,6 +251,27 @@ def list_recent_sources(session, ref_date, monday_includes_weekend=True):
                     summary=(item.get("summary") or "").strip(),
                 ))
     out.sort(key=lambda x: x["published_at"], reverse=True)
+    return out
+
+
+def list_week_sources(start_date, end_date, limit_per_blog=40):
+    """
+    [start_date, end_date](effective date 기준, 양끝 포함) 구간의 원문 전체.
+    추적 중인 모든 블로그·유튜브 채널 대상. list_recent_sources와 달리
+    LOOKBACK_ROWS(8) 제한 없이 한 주치를 넉넉히 가져온다.
+    """
+    out = []
+    for blog_id, label in _all_tracked_ids().items():
+        for item in _fetch_candidates(blog_id, limit=limit_per_blog):
+            d = _row_effective_date(item)
+            if start_date <= d <= end_date:
+                out.append(dict(
+                    source=label, title=item["title"], url=item["url"],
+                    published_at=item["published_at"], date=d.isoformat(),
+                    summary=(item.get("summary") or "").strip(),
+                    raw_content=(item.get("raw_content") or "").strip(),
+                ))
+    out.sort(key=lambda x: x["date"])
     return out
 
 
