@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 자동화 트리거 체커.
-  · 미국 증시 마감 체크윈도우 : 싱가폴 07:00 ~ 08:30 (하드스톱 08:30)
+  · 미국 증시 마감 체크윈도우 : 싱가폴 07:00 ~ 08:00 (하드스톱 08:00)
   · 한국 증시 마감 체크윈도우 : 싱가폴 17:00 ~ 18:00 (하드스톱 18:00)
   각 윈도우 동안 버터대디/증시각도기의 오늘자 콘텐츠가 하나라도 확인되면 즉시
   해당 세션의 briefing.build()를 실행한다. 윈도우 종료(hard stop)까지 아무것도
@@ -29,7 +29,7 @@ MARKER_DIR = os.path.join(os.path.dirname(__file__), "out", ".triggers")
 
 # (세션, 윈도우 시작 SGT 시각, 하드스톱 SGT 시각)
 WINDOWS = {
-    "us": (datetime.time(7, 0), datetime.time(8, 30)),
+    "us": (datetime.time(7, 0), datetime.time(8, 0)),
     "kr": (datetime.time(17, 0), datetime.time(18, 0)),
 }
 
