@@ -4,20 +4,20 @@
     "date": "2026-07-17",
     "theme": "coinbase",
     "path": "reports/us_coinbase_20260717.html",
-    "generated_at": "2026-07-19T13:53:17"
+    "generated_at": "2026-07-19T14:08:10"
   },
   {
     "session": "kr",
     "date": "2026-07-16",
     "theme": "coinbase",
     "path": "reports/kr_coinbase_20260716.html",
-    "generated_at": "2026-07-19T13:21:23"
+    "generated_at": "2026-07-19T14:10:35"
   },
   {
     "session": "us",
     "date": "2026-07-15",
     "theme": "coinbase",
     "path": "reports/us_coinbase_20260715.html",
-    "generated_at": "2026-07-19T13:23:30"
+    "generated_at": "2026-07-19T14:15:02"
   }
 ]
