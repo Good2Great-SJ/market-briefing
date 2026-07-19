@@ -87,22 +87,21 @@ def check_and_run(now_sgt=None, dry_run=False):
         print(f"[{session}] 트리거 발동 (사유: {reason}) — 브리핑 생성 시작")
         if not dry_run:
             import briefing, delivery
-            result = briefing.build(session=session, theme="coinbase", make_pdf=True)
+            result = briefing.build(session=session, theme="coinbase", make_pdf=False)
             _mark_done(session, date_str, reason)
             _, fn, pdf, report_url, viewer_url = result["outputs"][0]
             fired.append((session, reason, fn))
 
-            if pdf:
-                try:
-                    label = "미국 증시 마감" if session == "us" else "한국 증시 마감"
-                    subject = f"[{label} 브리핑] {result['ref']}"
-                    body = delivery.build_email_body(
-                        session, result["ref"], result["narr"], result["summary"], result["mc"],
-                        link_url=viewer_url or "")
-                    delivery.send_email(subject, body, [pdf])
-                    print(f"  → 이메일 발송 완료 ({subject})")
-                except Exception as e:
-                    print("  ! 이메일 발송 실패:", repr(e)[:200])
+            try:
+                label = "미국 증시 마감" if session == "us" else "한국 증시 마감"
+                subject = f"[{label} 브리핑] {result['ref']}"
+                body = delivery.build_email_body(
+                    session, result["ref"], result["narr"], result["summary"], result["mc"],
+                    link_url=viewer_url or "")
+                delivery.send_email(subject, body, [])
+                print(f"  → 이메일 발송 완료 ({subject})")
+            except Exception as e:
+                print("  ! 이메일 발송 실패:", repr(e)[:200])
         else:
             fired.append((session, reason, None))
     return fired

@@ -41,9 +41,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: market-briefing
-        run: |
-          pip install -r requirements.txt
-          python -m playwright install --with-deps chromium
+        run: pip install -r requirements.txt
 
       - name: Run trigger check
         working-directory: market-briefing

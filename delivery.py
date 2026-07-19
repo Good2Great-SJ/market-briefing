@@ -63,9 +63,7 @@ def build_email_body(session, ref, narr, summary, mc, link_url=""):
             lines.append(f"  - {c.get('date','')} {c.get('event','')}")
     if link_url:
         lines.append("")
-        lines.append(f"웹에서 보기: {link_url}")
-    lines.append("")
-    lines.append("첨부된 PDF에서 전체 리포트를 확인하세요.")
+        lines.append(f"웹에서 전체 리포트 보기: {link_url}")
     return "\n".join(lines)
 
 
