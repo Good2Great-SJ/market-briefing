@@ -1,0 +1,58 @@
+name: Weekly Digest
+
+# 매주 토요일 싱가폴 09:00(= UTC 01:00, 금요일 한국·미국 마감 리포트가 모두
+# 나온 뒤)에 그 주(월~금) 동안 수집된 모든 블로그·유튜브 원문을 모아
+# 핵심 키워드·주요 이벤트·주간 총평을 이메일로 보낸다.
+on:
+  schedule:
+    - cron: "0 1 * * 6" # 싱가폴 토요일 09:00
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  weekly-digest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout market-briefing
+        uses: actions/checkout@v4
+        with:
+          path: market-briefing
+
+      - name: Checkout naver-blog-kakao-notifier (최신 state.db)
+        uses: actions/checkout@v4
+        with:
+          repository: Good2Great-SJ/naver-blog-kakao-notifier
+          path: naver-blog-kakao-notifier
+          token: ${{ secrets.NOTIFIER_REPO_TOKEN }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        working-directory: market-briefing
+        run: pip install -r requirements.txt
+
+      - name: Run weekly digest
+        working-directory: market-briefing
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          EMAIL_SMTP_HOST: ${{ secrets.EMAIL_SMTP_HOST }}
+          EMAIL_SMTP_PORT: ${{ secrets.EMAIL_SMTP_PORT }}
+          EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
+          EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}
+          EMAIL_RECEIVER: ${{ secrets.EMAIL_RECEIVER }}
+        run: python weekly.py
+
+      - name: Commit 발송 마커
+        working-directory: market-briefing
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -d out/.triggers ]; then
+            git add -f out/.triggers/
+          fi
+          git diff --cached --quiet || git commit -m "chore: 주간 다이제스트 발송 마커 [skip ci]"
+          git push
