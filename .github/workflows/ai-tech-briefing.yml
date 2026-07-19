@@ -2,8 +2,8 @@ name: AI & Technology Briefing
 
 on:
   schedule:
-    # GitHub cron uses UTC. These are 07:00 and 16:00 Asia/Singapore (UTC+8).
-    - cron: "0 23 * * *"
+    # GitHub cron uses UTC. These are 06:30 and 16:00 Asia/Singapore (UTC+8).
+    - cron: "30 22 * * *"
     - cron: "0 8 * * *"
   workflow_dispatch:
     inputs:
@@ -56,7 +56,7 @@ jobs:
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             edition="$MANUAL_EDITION"
-          elif [[ "$SCHEDULE" == "0 23 * * *" ]]; then
+          elif [[ "$SCHEDULE" == "30 22 * * *" ]]; then
             edition="morning"
           else
             edition="afternoon"

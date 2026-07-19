@@ -1,7 +1,7 @@
 # AI·반도체·테크 데일리 브리핑
 
 GitHub Actions가 OpenAI Responses API의 웹 검색 도구를 사용해 한국어 뉴스
-브리핑을 생성합니다. 매일 Asia/Singapore 기준 오전 07:00과 오후 16:00에
+브리핑을 생성합니다. 매일 Asia/Singapore 기준 오전 06:30과 오후 16:00에
 실행되며, 결과는 `chatgpt-ai-tech/daily/YYYY-MM-DD-{edition}.md`에 저장됩니다.
 이미 존재하는 브리핑은 덮어쓰지 않습니다.
 
@@ -33,7 +33,7 @@ API 키를 파일, 커밋, 로그에 직접 넣지 마세요.
 
 GitHub Actions cron은 UTC를 사용하므로 다음과 같이 변환되어 있습니다.
 
-- `0 23 * * *`: 다음 날 07:00 Asia/Singapore
+- `30 22 * * *`: 다음 날 06:30 Asia/Singapore
 - `0 8 * * *`: 같은 날 16:00 Asia/Singapore
 
 GitHub의 예약 실행은 서비스 부하에 따라 몇 분 늦게 시작될 수 있습니다.
