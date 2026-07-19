@@ -1,0 +1,80 @@
+name: AI & Technology Briefing
+
+on:
+  schedule:
+    # GitHub cron uses UTC. These are 07:00 and 16:00 Asia/Singapore (UTC+8).
+    - cron: "0 23 * * *"
+    - cron: "0 8 * * *"
+  workflow_dispatch:
+    inputs:
+      edition:
+        description: Briefing edition to generate
+        required: true
+        default: morning
+        type: choice
+        options:
+          - morning
+          - afternoon
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ai-tech-briefing-${{ github.event_name == 'workflow_dispatch' && inputs.edition || github.event.schedule }}
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-5.6-terra' }}
+      TZ: Asia/Singapore
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: scripts/requirements.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r scripts/requirements.txt
+
+      - name: Select edition
+        id: edition
+        shell: bash
+        env:
+          MANUAL_EDITION: ${{ inputs.edition }}
+          SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            edition="$MANUAL_EDITION"
+          elif [[ "$SCHEDULE" == "0 23 * * *" ]]; then
+            edition="morning"
+          else
+            edition="afternoon"
+          fi
+          echo "edition=$edition" >> "$GITHUB_OUTPUT"
+
+      - name: Generate briefing
+        run: python scripts/generate_ai_tech_briefing.py --edition "${{ steps.edition.outputs.edition }}"
+
+      - name: Commit generated briefing only
+        shell: bash
+        run: |
+          expected="chatgpt-ai-tech/daily/$(date +%F)-${{ steps.edition.outputs.edition }}.md"
+          test -f "$expected"
+          git add -- "$expected"
+          staged="$(git diff --cached --name-only)"
+          test "$staged" = "$expected"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Add $(date +%F) ${{ steps.edition.outputs.edition }} AI tech briefing"
+          git push
