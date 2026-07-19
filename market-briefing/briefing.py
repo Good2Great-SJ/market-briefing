@@ -28,6 +28,7 @@ import analytics
 import narrative
 import themes
 import sources as srcmod
+import ai_tech
 
 for _f in ("Malgun Gothic", "Apple SD Gothic Neo", "NanumGothic", "DejaVu Sans"):
     try:
@@ -268,7 +269,7 @@ _NAV_LABELS = {
     "narr": "총평", "sources": "소스", "macro": "매크로", "fed": "Fed",
     "us_idx": "미국지수", "global": "글로벌", "semi": "반도체", "sectors": "섹터",
     "rs": "RS랭킹", "m7": "M7·AI", "chart_us": "차트(US)",
-    "kr": "한국시장", "chart_kr": "차트(KR)",
+    "kr": "한국시장", "chart_kr": "차트(KR)", "aitech": "AI·Tech",
 }
 
 
@@ -393,6 +394,10 @@ def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None)
         print(f"  - {k}:", v["title"][:40] if v else "없음(미발행)")
     src_list = srcmod.list_recent_sources(session, ref_date)
 
+    print("· AI-Tech 뉴스 확인…")
+    aitech_md, aitech_date = ai_tech.get_ai_tech_markdown(session, datetime.datetime.now(KST).date())
+    print("  →", f"{aitech_date.isoformat()} 발행분 확인" if aitech_md else "없음(미발행)")
+
     # 총평 (원천 콘텐츠 우선, 없으면 웹서치)
     print("· 총평 생성…")
     digest = build_digest(session, yf_data, kr_idx, mc, money, summary, breadth)
@@ -413,7 +418,7 @@ def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None)
     for th in theme_list:
         html = render(session, ref_str, now_kst, yf_data, kr_idx, kr_stk, money,
                       charts_us, charts_kr, summary, mc, breadth, flows, narr, th, rs, src, credit_interp,
-                      fed_odds, src_list)
+                      fed_odds, src_list, aitech_md, aitech_date)
         base = f"out/briefing_{session}_{th}_{ref_str.replace('-','')}"
         fn = base + ".html"
         with open(fn, "w", encoding="utf-8") as f:
@@ -475,7 +480,7 @@ def build_digest(session, yf_data, kr_idx, mc, money, summary, breadth):
 # ══════════════════════════════════════════════════════════════
 def render(session, ref, now, yf_data, kr_idx, kr_stk, money,
            charts_us, charts_kr, summary, mc, breadth, flows, narr, theme="coinbase", rs=None, src=None,
-           credit_interp=None, fed_odds=None, src_list=None):
+           credit_interp=None, fed_odds=None, src_list=None, aitech_md=None, aitech_date=None):
     css = themes.get_css(theme, CSS)
     kr_all = {**kr_idx, **kr_stk}
     title = "미국 증시 마감 브리핑" if session == "us" else "한국 증시 마감 브리핑"
@@ -569,11 +574,12 @@ def render(session, ref, now, yf_data, kr_idx, kr_stk, money,
         "chart_us": section("chart_us", "Charts · US", "주요 차트 (미국)", "종가 + MA10 / 50 / 200", chart_grid(charts_us)),
         "kr":      section("kr", "KR Market", "한국 시장", "지수 · 시총 수준 · 예탁금 · 신용잔고 · 관심종목", kr_block),
         "chart_kr": section("chart_kr", "Charts · KR", "주요 차트 (한국)", "종가 + MA10 / 50 / 200", chart_grid(charts_kr)),
+        "aitech":   render_ai_tech(aitech_md, aitech_date),
     }
     if session == "us":
-        order = ["macro", "fed", "us_idx", "global", "semi", "sectors", "rs", "m7", "chart_us", "kr", "chart_kr"]
+        order = ["macro", "fed", "us_idx", "global", "semi", "sectors", "rs", "m7", "chart_us", "kr", "chart_kr", "aitech"]
     else:
-        order = ["kr", "chart_kr", "macro", "fed", "us_idx", "semi", "sectors", "rs", "m7", "global", "chart_us"]
+        order = ["kr", "chart_kr", "macro", "fed", "us_idx", "semi", "sectors", "rs", "m7", "global", "chart_us", "aitech"]
     body_sections = "".join(S[k] for k in order)
     nav_keys = ["narr"] + (["sources"] if source_list_html else []) + [k for k in order if S[k]]
     nav_html = render_nav(nav_keys)
@@ -746,6 +752,19 @@ def render_source_list(src_list):
       <h2>주요 블로그 및 영상</h2>
       <div class="srcl-card">{rows}</div>
     </section>{script}'''
+
+
+def render_ai_tech(md_text, file_date):
+    if not md_text:
+        return ""
+    import markdown as md
+    body_html = md.markdown(md_text, extensions=["extra", "sane_lists"])
+    date_s = file_date.isoformat() if file_date else ""
+    return f'''<section class="brief" id="aitech">
+      <div class="eyebrow"><span class="badge">AI · Tech</span><span class="sub">{date_s} 발행</span></div>
+      <h2>AI-Tech 뉴스</h2>
+      <div class="ov-card aitech-body">{body_html}</div>
+    </section>'''
 
 
 def render_fed_odds(fed_list):
@@ -972,6 +991,22 @@ h2{font-size:29px;font-weight:400;letter-spacing:-.6px;margin:0 0 16px;color:var
 .ov-card{background:var(--soft);border-radius:18px;padding:20px 24px;font-size:16px;line-height:1.68;color:var(--ink);}
 .ov-card p{margin:0 0 20px;} .ov-card p:last-child{margin-bottom:0;}
 .ov-card p.ov-concl{margin-top:4px;padding-top:16px;border-top:1px solid var(--hair);font-weight:600;}
+.aitech-body{font-size:15px;}
+.aitech-body h1,.aitech-body h2,.aitech-body h3{font-size:15.5px;font-weight:700;color:var(--ink);margin:22px 0 10px;}
+.aitech-body h1:first-child,.aitech-body h2:first-child,.aitech-body h3:first-child{margin-top:0;}
+.aitech-body p{margin:0 0 16px;}
+.aitech-body ul,.aitech-body ol{margin:0 0 16px;padding-left:22px;}
+.aitech-body li{margin:6px 0;line-height:1.65;}
+.aitech-body li>p{margin:0;}
+.aitech-body strong{color:var(--ink);font-weight:700;}
+.aitech-body a{color:var(--primary);text-decoration:none;}
+.aitech-body a:hover{text-decoration:underline;}
+.aitech-body blockquote{margin:0 0 16px;padding:10px 16px;border-left:3px solid var(--primary);
+background:var(--strong);border-radius:0 8px 8px 0;color:var(--muted);}
+.aitech-body code{background:var(--strong);padding:2px 6px;border-radius:5px;font-family:var(--mono);font-size:.9em;}
+.aitech-body pre{background:var(--strong);border-radius:10px;padding:14px 16px;overflow-x:auto;margin:0 0 16px;}
+.aitech-body pre code{background:none;padding:0;}
+.aitech-body hr{border:none;border-top:1px solid var(--hair);margin:20px 0;}
 .src-card{border-left:3px solid var(--primary);}
 .src-card-h{font-size:13px;font-weight:700;letter-spacing:.02em;color:var(--primary);margin-bottom:10px;}
 .brief-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;}
