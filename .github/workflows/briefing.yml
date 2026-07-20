@@ -71,5 +71,10 @@ jobs:
           if [ -d docs ]; then
             git add -f docs/
           fi
-          git diff --cached --quiet || git commit -m "chore: 데일리 브리핑 자동 생성 [skip ci]"
+          # [skip ci]를 붙이면 GitHub가 이 커밋에 대한 모든 push 트리거 워크플로우를
+          # 건너뛰는데, 그러면 docs/ 변경으로 실행돼야 할 Deploy Pages도 함께
+          # 스킵되어 리포트가 커밋만 되고 실제 사이트에는 반영이 안 된다(2026-07-20
+          # 실제 발생). Trigger Check 자신은 on: push가 없어 재귀 트리거 걱정이
+          # 없으므로 [skip ci]를 뺀다.
+          git diff --cached --quiet || git commit -m "chore: 데일리 브리핑 자동 생성"
           git push

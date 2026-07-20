@@ -65,7 +65,7 @@ const frameWrap = document.getElementById("frameWrap");
 let manifest = [];
 
 function label(r){
-  const sess = r.session === "us" ? "미국 증시 마감" : "한국 증시 마감";
+  const sess = r.title || (r.session === "us" ? "미국 증시 마감" : "한국 증시 마감");
   return `${r.date} · ${sess}`;
 }
 

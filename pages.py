@@ -25,9 +25,12 @@ def _load_manifest():
         return []
 
 
-def publish_report(session, theme, date_str, html_path):
+def publish_report(session, theme, date_str, html_path, title=None):
     """
     생성된 리포트 HTML을 docs/reports/에 복사하고 manifest.json을 갱신한다.
+    title: 아카이브 드롭다운에 표시할 리포트 제목. 거래일 공백(월요일 등) 리포트처럼
+    session만으로는 실제 제목("한국증시 장전 리포트" 등)을 알 수 없는 경우에 넘긴다.
+    생략하면 뷰어(index.html)가 session 기준 기본 라벨로 대체한다.
     반환값: (report_url, viewer_url) — 이메일 등에 바로 쓸 수 있는 절대 URL.
     """
     os.makedirs(_REPORTS, exist_ok=True)
@@ -37,11 +40,14 @@ def publish_report(session, theme, date_str, html_path):
 
     manifest = _load_manifest()
     manifest = [r for r in manifest if not (r.get("session") == session and r.get("date") == date_str)]
-    manifest.append(dict(
+    entry = dict(
         session=session, date=date_str, theme=theme,
         path=f"reports/{fname}",
         generated_at=datetime.datetime.now().isoformat(timespec="seconds"),
-    ))
+    )
+    if title:
+        entry["title"] = title
+    manifest.append(entry)
     manifest.sort(key=lambda r: (r["date"], r["session"]), reverse=True)
 
     with open(_MANIFEST, "w", encoding="utf-8") as f:
