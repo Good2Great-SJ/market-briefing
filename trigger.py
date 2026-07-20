@@ -93,7 +93,14 @@ def check_and_run(now_sgt=None, dry_run=False):
         print(f"[{session}] 트리거 발동 (사유: {reason}) — 브리핑 생성 시작")
         if not dry_run:
             import briefing, delivery
-            result = briefing.build(session=session, theme="coinbase", make_pdf=False)
+            # source_date=today_kst: 위에서 이미 today_kst 기준으로 소스 존재를
+            # 확인해 트리거를 발동시켰으므로, 실제 빌드도 같은 날짜로 소스를 찾게
+            # 한다. 주말 등 거래일 공백 직후(예: 월요일)에는 시장 데이터 기준일
+            # (ref_date)만으로 역산한 '기대 날짜'가 오늘과 어긋나 다른 소스를
+            # 찾아버리는 문제가 있었다 — 시장 데이터는 직전 영업일 것을 그대로
+            # 쓰되, 총평/블로그·영상/AI-Tech는 항상 오늘 날짜 기준 최신으로 맞춘다.
+            result = briefing.build(session=session, theme="coinbase", make_pdf=False,
+                                     source_date=today_kst)
             _mark_done(session, date_str, reason)
             _, fn, pdf, report_url, viewer_url = result["outputs"][0]
             fired.append((session, reason, fn))
