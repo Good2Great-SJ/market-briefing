@@ -662,7 +662,7 @@ def render(session, ref, now, yf_data, kr_idx, kr_stk, money,
         <div class="sc mut">美 지수·반도체·섹터·M7·글로벌 지수</div></div>
       <div class="scard"><div class="sl">시장폭 · 50일선 상회 비율</div>
         <div class="sv num">{b50}</div><div class="sc mut">200일선 상회 {f"{breadth['pct200']:.0f}%" if breadth else "–"}</div></div>
-      <div class="scard"><div class="sl">고객예탁금</div>
+      <div class="scard"><div class="sl">고객예탁금 <span class="mut" style="font-weight:400">(기준 {m_date})</span></div>
         <div class="sv num">{yetak}</div><div class="sc num">{yetak_c}</div></div>
       <div class="scard"><div class="sl">코스피 시총 · 5년내 위치</div>
         <div class="sv num">{kospi_pos}</div><div class="sc mut">신용 {sinyong}</div></div>'''
