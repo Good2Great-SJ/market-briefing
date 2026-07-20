@@ -403,6 +403,14 @@ def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None,
     # 쓰되, 총평 소스는 그 사이(주말 등)에 올라온 글까지 넓혀서 찾는다.
     is_gap = session == "us" and (want_date - ref_date).days > 1
     if is_gap:
+        import calendars
+        if calendars.is_kr_market_holiday(want_date):
+            # 장전 리포트는 "오늘 한국장 개장 전" 프리뷰가 목적인데, 오늘(want_date)
+            # 자체가 한국 증시 휴장일이면 애초에 열릴 장이 없어 발행할 이유가 없다.
+            # 이후의 비싼 작업(총평 생성 API 호출, 차트 렌더링 등)을 건너뛰기 위해
+            # 여기서 바로 중단한다.
+            print(f"  ! {want_date.isoformat()}은 한국 증시 휴장일 — 장전 리포트 생략")
+            return dict(skipped="kr_holiday", session=session, want_date=want_date.isoformat())
         src_start = ref_date + datetime.timedelta(days=1)
         print(f"  (기대 날짜: {want_date.isoformat()} · 거래일 공백 감지, {src_start.isoformat()}~{want_date.isoformat()} 구간에서 탐색)")
         src = srcmod.get_sources_for_range(src_start, want_date, session)

@@ -114,6 +114,11 @@ def check_and_run(now_sgt=None, dry_run=False):
             result = briefing.build(session=session, theme="coinbase", make_pdf=False,
                                      source_date=today_kst)
             _mark_done(session, date_str, reason)
+            if result.get("skipped"):
+                # 예: 월요일 장전 리포트인데 오늘이 한국 증시 휴장일 — 열릴 장이
+                # 없으니 발행·발송 없이 조용히 넘어간다(내일 다시 정상 판단됨).
+                print(f"[{session}] 생략 — {result['skipped']} ({result.get('want_date')})")
+                continue
             _, fn, pdf, report_url, viewer_url = result["outputs"][0]
             fired.append((session, reason, fn))
             _send_report_email(session, result, viewer_url)
@@ -196,6 +201,10 @@ def recheck_pending_updates(now_sgt=None):
             src_date = datetime.date.fromisoformat(marker["source_date"])
             result = briefing.build(session=marker["session"], theme=marker.get("theme", "coinbase"),
                                      make_pdf=False, source_date=src_date)
+            if result.get("skipped"):
+                print(f"[재발행] 생략 — {result['skipped']}")
+                os.remove(path)
+                continue
             _, _, _, _, viewer_url = result["outputs"][0]
             _send_report_email(marker["session"], result, viewer_url, note=" · ".join(reasons))
             updated.append((marker["session"], marker["archive_date"]))
