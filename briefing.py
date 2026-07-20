@@ -1006,15 +1006,18 @@ border-radius:100px;padding:6px 14px;text-decoration:none;}
 
 .wrap{max-width:1120px;margin:0 auto;padding:8px 24px 72px;}
 section{margin-top:46px;scroll-margin-top:60px;}
-.eyebrow{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+.eyebrow{display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;}
 .badge{display:inline-block;font-size:11.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;
 background:var(--strong);color:var(--ink);border-radius:100px;padding:5px 13px;}
 .badge-key{background:var(--primary);color:#fff;}
 .eyebrow .sub{font-size:13px;color:var(--muted);}
-.src-badges{margin-left:auto;display:flex;gap:8px;}
-.src-badge{font-size:11.5px;font-weight:600;color:var(--primary);text-decoration:none;
-background:var(--strong);border-radius:100px;padding:4px 11px;}
+.src-badges{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;}
+.src-badge{font-size:11.5px;font-weight:600;color:var(--primary);text-decoration:none;white-space:nowrap;
+background:var(--strong);border-radius:100px;padding:4px 11px;flex:0 0 auto;}
 .src-badge:hover{text-decoration:underline;}
+@media (max-width:640px){
+  .src-badges{margin-left:0;width:100%;}
+}
 .srcl-card{background:var(--card);border:1px solid var(--hair);border-radius:20px;overflow:hidden;}
 .srcl-row{padding:18px 20px;border-bottom:1px solid var(--hairsoft);}
 .srcl-row:last-child{border-bottom:none;}
