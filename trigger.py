@@ -135,10 +135,10 @@ def _send_report_email(result, viewer_url, note=None):
     import delivery
     try:
         subject = f"[{result['title']}] {result['ref']}" + (f" ({note})" if note else "")
-        body = delivery.build_email_body(
-            result["title"], result["ref"], result["narr"], result["summary"], result["mc"],
-            link_url=viewer_url or "")
-        delivery.send_email(subject, body, [])
+        args = (result["title"], result["ref"], result["narr"], result["summary"], result["mc"])
+        body = delivery.build_email_body(*args, link_url=viewer_url or "")
+        html_body = delivery.build_email_html(*args, link_url=viewer_url or "")
+        delivery.send_email(subject, body, [], html_body=html_body)
         print(f"  → 이메일 발송 완료 ({subject})")
     except Exception as e:
         print("  ! 이메일 발송 실패:", repr(e)[:200])
