@@ -479,7 +479,8 @@ def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None,
         report_url = viewer_url = None
         try:
             import pages
-            report_url, viewer_url = pages.publish_report(session, th, archive_date_str, fn)
+            report_url, viewer_url = pages.publish_report(session, th, archive_date_str, fn,
+                                                            title=report_title if is_gap else None)
             print("· Pages:", viewer_url)
         except Exception as e:
             print("  ! GitHub Pages 발행 실패:", repr(e)[:150])

@@ -39,7 +39,19 @@ def _marker_path(session, date_str):
 
 
 def _already_done(session, date_str):
-    return os.path.exists(_marker_path(session, date_str))
+    if os.path.exists(_marker_path(session, date_str)):
+        return True
+    # out/ 마커 파일은 워크플로우 자신이 매 실행 뒤 커밋해야 다음 실행에 남는데,
+    # (예: 로컬에서 소스만 수동으로 push하고 out/는 안 올린 경우) 그 커밋이 누락되면
+    # 마커가 유실돼 이미 발행된 세션을 또 재발행·재발송할 수 있다. docs/manifest.json은
+    # 항상 함께 커밋되는 실제 발행 기록이므로 이걸로도 한 번 더 확인한다.
+    try:
+        manifest_path = os.path.join(os.path.dirname(__file__), "docs", "manifest.json")
+        with open(manifest_path, encoding="utf-8") as f:
+            manifest = json.load(f)
+        return any(r.get("session") == session and r.get("date") == date_str for r in manifest)
+    except Exception:
+        return False
 
 
 def _mark_done(session, date_str, reason):
