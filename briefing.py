@@ -664,10 +664,13 @@ def render(session, ref, now, yf_data, kr_idx, kr_stk, money,
     # ── 히어로 스탯 카드 ──
     b50 = f"{breadth['pct50']:.0f}%" if breadth else "–"
     kospi_pos = f"{mc['KOSPI']['pct5']:.0f}%" if "KOSPI" in mc else "–"
+    # 이 카드는 세션(us/kr) 상관없이 항상 미국·글로벌 지수를 스캔한 숫자라
+    # "한국증시 마감" 리포트에서 특히 헷갈리기 쉬웠다 — 배지와 기준일을 명시.
+    yf_ref = yf_data["^GSPC"].index[-1].strftime("%Y-%m-%d") if "^GSPC" in yf_data else "-"
     hero_cards = f'''
-      <div class="scard"><div class="sl">스캔 {breadth['n'] if breadth else summary['n_up']+summary['n_dn']}종목 상승 / 하락</div>
+      <div class="scard"><div class="sl">스캔 {breadth['n'] if breadth else summary['n_up']+summary['n_dn']}종목 상승 / 하락 <span class="badge" style="font-size:9.5px;padding:2px 8px;vertical-align:1px">美/글로벌</span></div>
         <div class="sv"><span class="up">{summary['n_up']}</span> <span class="sep">/</span> <span class="dn">{summary['n_dn']}</span></div>
-        <div class="sc mut">美 지수·반도체·섹터·M7·글로벌 지수</div></div>
+        <div class="sc mut">美 지수·반도체·섹터·M7·글로벌 지수 (기준 {yf_ref})</div></div>
       <div class="scard"><div class="sl">시장폭 · 50일선 상회 비율</div>
         <div class="sv num">{b50}</div><div class="sc mut">200일선 상회 {f"{breadth['pct200']:.0f}%" if breadth else "–"}</div></div>
       <div class="scard"><div class="sl">고객예탁금 <span class="mut" style="font-weight:400">(기준 {m_date})</span></div>
