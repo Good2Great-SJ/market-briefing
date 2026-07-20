@@ -26,6 +26,17 @@ def html_to_pdf(html_path, pdf_path=None):
     return pdf_path
 
 
+def _spaced_paragraphs(text):
+    """단락 사이에 빈 줄을 넣어 읽기 편하게 만든다.
+
+    narr의 각 텍스트 필드는 원래 \\n 하나로만 단락이 구분돼 있어(HTML 쪽은
+    _paragraphs()가 이걸 <p> 태그로 바꿔 시각적 여백을 만들지만) 텍스트 메일에서는
+    줄바꿈이 단락처럼 안 보이고 다 붙어 있는 것처럼 읽혔다 — 빈 줄로 재구성한다.
+    """
+    parts = [p.strip() for p in text.split("\n") if p.strip()]
+    return "\n\n".join(parts)
+
+
 def build_email_body(session, ref, narr, summary, mc, link_url=""):
     """이메일 본문. 총평(소스별 분리, 전문) + 핵심 지표 + 리포트 링크."""
     label = "미국 증시 마감" if session == "us" else "한국 증시 마감"
@@ -35,14 +46,14 @@ def build_email_body(session, ref, narr, summary, mc, link_url=""):
     if bd or jg:
         if bd:
             lines.append("■ 버터대디 총평")
-            lines.append(bd.strip())
+            lines.append(_spaced_paragraphs(bd))
             lines.append("")
         if jg:
             lines.append("■ 증시각도기 총평")
-            lines.append(jg.strip())
+            lines.append(_spaced_paragraphs(jg))
             lines.append("")
     elif narr and narr.get("overview"):
-        lines.append(narr["overview"].strip())
+        lines.append(_spaced_paragraphs(narr["overview"]))
         lines.append("")
     else:
         lines.append(f"상승 {summary['n_up']} / 하락 {summary['n_dn']} · "
