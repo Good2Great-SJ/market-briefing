@@ -12,7 +12,7 @@
   python briefing.py kr      # 한국 증시 마감 브리핑
   python briefing.py         # KST 시각으로 자동 판별
 """
-import warnings, io, base64, datetime, os, sys
+import warnings, io, base64, datetime, os, sys, json
 warnings.filterwarnings("ignore")
 
 import numpy as np
@@ -438,6 +438,23 @@ def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None,
         archive_date_str = want_date.isoformat()
         report_title = f"{want_date.month}월 {want_date.day}일({weekday_kr}) 한국증시 장전 리포트"
         gap_info = dict(display_date=archive_date_str, weekday_kr=weekday_kr, market_ref=ref_str, title=report_title)
+
+    # 매칭된 원천(버터대디/증시각도기) 중 자막이 아직 안 붙어 설명란으로만
+    # 채워진(status=transcript_pending) 게 있으면, 나중에 자막이 늦게 들어왔을 때
+    # trigger.py가 이 리포트를 자동으로 재발행할 수 있도록 마커를 남겨둔다.
+    pending = {v["post_id"]: len(v.get("raw_content") or "")
+               for v in src.values() if v and v.get("status") == "transcript_pending"}
+    marker_dir = os.path.join("out", ".triggers")
+    marker_path = os.path.join(marker_dir, f"{session}_{archive_date_str}.pending.json")
+    if pending:
+        os.makedirs(marker_dir, exist_ok=True)
+        with open(marker_path, "w", encoding="utf-8") as f:
+            json.dump(dict(session=session, theme=theme, source_date=want_date.isoformat(),
+                           archive_date=archive_date_str, pending=pending,
+                           first_seen=datetime.datetime.now(KST).isoformat()), f, ensure_ascii=False)
+        print(f"  (자막 대기 중인 원천 {len(pending)}건 — 추후 자동 재발행 대상으로 표시)")
+    elif os.path.exists(marker_path):
+        os.remove(marker_path)
 
     theme_list = ["coinbase", "apple"] if theme == "both" else [theme]
     os.makedirs("out", exist_ok=True)

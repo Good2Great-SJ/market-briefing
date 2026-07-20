@@ -119,6 +119,65 @@ def check_and_run(now_sgt=None, dry_run=False):
     return fired
 
 
+PENDING_RETRY_HOURS = 6  # naver-blog-kakao-notifier의 TRANSCRIPT_RETRY_HOURS(자막 재시도 포기 시한)과 맞춤
+
+
+def recheck_pending_updates(now_sgt=None):
+    """자막이 늦게 붙는 원천(주로 증시각도기 라이브 방송)을 감지해 리포트를 재발행한다.
+
+    briefing.build()는 매칭된 원천 중 status=transcript_pending인 게 있으면
+    out/.triggers/{session}_{date}.pending.json에 마커를 남긴다. 여기서 그
+    마커들을 훑어 자막이 실제로 붙었는지(status가 collected 등으로 바뀌었는지)
+    확인하고, 붙었으면 같은 날짜로 브리핑을 재빌드해 같은 파일명/아카이브
+    항목을 덮어쓴다(새 아카이브 항목이 늘어나지 않음). PENDING_RETRY_HOURS가
+    지나도 안 붙으면 — naver-blog-kakao-notifier 쪽도 그때는 포기하므로 —
+    마커를 지우고 더는 확인하지 않는다.
+    """
+    now_sgt = now_sgt or datetime.datetime.now(SGT)
+    updated = []
+    if not os.path.isdir(MARKER_DIR):
+        return updated
+
+    import sources, briefing
+    for fn in sorted(os.listdir(MARKER_DIR)):
+        if not fn.endswith(".pending.json"):
+            continue
+        path = os.path.join(MARKER_DIR, fn)
+        try:
+            with open(path, encoding="utf-8") as f:
+                marker = json.load(f)
+        except Exception:
+            continue
+
+        # status가 바뀌어도(naver-blog-kakao-notifier가 재시도를 포기해도) 자막
+        # 없이 설명란만으로 확정된 경우엔 내용이 그대로라 다시 빌드해봐야 무의미
+        # 하다 — 실제로 분량이 늘어난 경우만 "해결됨"으로 본다.
+        still_pending, resolved = {}, False
+        for pid, baseline_len in marker["pending"].items():
+            post = sources.get_post_by_id(pid)
+            rclen = len(post.get("raw_content") or "") if post else baseline_len
+            if post and post.get("status") != "transcript_pending" and rclen > baseline_len + 100:
+                resolved = True
+            else:
+                still_pending[pid] = baseline_len
+
+        if resolved:
+            print(f"[재발행] {marker['session']} {marker['archive_date']} — 지연 자막 입수, 리포트 갱신")
+            src_date = datetime.date.fromisoformat(marker["source_date"])
+            briefing.build(session=marker["session"], theme=marker.get("theme", "coinbase"),
+                            make_pdf=False, source_date=src_date)
+            updated.append((marker["session"], marker["archive_date"]))
+
+        elapsed_h = (now_sgt - datetime.datetime.fromisoformat(marker["first_seen"])).total_seconds() / 3600
+        if still_pending and elapsed_h < PENDING_RETRY_HOURS:
+            marker["pending"] = still_pending
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(marker, f, ensure_ascii=False)
+        else:
+            os.remove(path)
+    return updated
+
+
 if __name__ == "__main__":
     dry = "--dry-run" in sys.argv
     fired = check_and_run(dry_run=dry)
@@ -127,3 +186,7 @@ if __name__ == "__main__":
     else:
         for session, reason, _ in fired:
             print(f"완료: {session} ({reason})")
+    if not dry:
+        updated = recheck_pending_updates()
+        for session, date_str in updated:
+            print(f"재발행 완료: {session} ({date_str})")
