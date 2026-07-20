@@ -395,8 +395,17 @@ def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None,
     # 원천 콘텐츠 (버터대디/증시각도기)
     print("· 원천 콘텐츠 확인 (버터대디/증시각도기)…")
     want_date = source_date or srcmod.expected_date(session, ref_date)
-    print(f"  (기대 날짜: {want_date.isoformat()})")
-    src = srcmod.get_sources_for_label_date(want_date, session)
+    # 거래일 공백(주말·연휴 등으로 want_date가 ref_date+1보다 더 뒤로 밀린 경우,
+    # 예: 금요일 마감 다음 월요일 아침) — 시장 데이터는 직전 개장일 것을 그대로
+    # 쓰되, 총평 소스는 그 사이(주말 등)에 올라온 글까지 넓혀서 찾는다.
+    is_gap = session == "us" and (want_date - ref_date).days > 1
+    if is_gap:
+        src_start = ref_date + datetime.timedelta(days=1)
+        print(f"  (기대 날짜: {want_date.isoformat()} · 거래일 공백 감지, {src_start.isoformat()}~{want_date.isoformat()} 구간에서 탐색)")
+        src = srcmod.get_sources_for_range(src_start, want_date, session)
+    else:
+        print(f"  (기대 날짜: {want_date.isoformat()})")
+        src = srcmod.get_sources_for_label_date(want_date, session)
     for k, v in src.items():
         print(f"  - {k}:", v["title"][:40] if v else "없음(미발행)")
     src_list = srcmod.list_recent_sources(session, ref_date, want_date_override=source_date)
@@ -419,14 +428,25 @@ def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None,
     charts_kr = [(nm, chart_b64(kr_all[tk], nm))
                  for tk, nm in U.CHART_TARGETS_KR if tk in kr_all]
 
+    # 거래일 공백 리포트는 "미국 증시 마감"이 아니라 그날 날짜의 장전 리포트로
+    # 제목·아카이브 날짜를 바꾼다(시장 데이터 자체는 ref_str/직전 개장일 그대로).
+    gap_info = None
+    archive_date_str = ref_str
+    report_title = "미국 증시 마감 브리핑" if session == "us" else "한국 증시 마감 브리핑"
+    if is_gap:
+        weekday_kr = ["월", "화", "수", "목", "금", "토", "일"][want_date.weekday()]
+        archive_date_str = want_date.isoformat()
+        report_title = f"{want_date.month}월 {want_date.day}일({weekday_kr}) 한국증시 장전 리포트"
+        gap_info = dict(display_date=archive_date_str, weekday_kr=weekday_kr, market_ref=ref_str, title=report_title)
+
     theme_list = ["coinbase", "apple"] if theme == "both" else [theme]
     os.makedirs("out", exist_ok=True)
     outputs = []
     for th in theme_list:
         html = render(session, ref_str, now_kst, yf_data, kr_idx, kr_stk, money,
                       charts_us, charts_kr, summary, mc, breadth, flows, narr, th, rs, src, credit_interp,
-                      fed_odds, src_list, aitech_md, aitech_date)
-        base = f"out/briefing_{session}_{th}_{ref_str.replace('-','')}"
+                      fed_odds, src_list, aitech_md, aitech_date, gap_info)
+        base = f"out/briefing_{session}_{th}_{archive_date_str.replace('-','')}"
         fn = base + ".html"
         with open(fn, "w", encoding="utf-8") as f:
             f.write(html)
@@ -442,13 +462,13 @@ def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None,
         report_url = viewer_url = None
         try:
             import pages
-            report_url, viewer_url = pages.publish_report(session, th, ref_str, fn)
+            report_url, viewer_url = pages.publish_report(session, th, archive_date_str, fn)
             print("· Pages:", viewer_url)
         except Exception as e:
             print("  ! GitHub Pages 발행 실패:", repr(e)[:150])
         outputs.append((th, fn, pdf, report_url, viewer_url))
-    return dict(session=session, ref=ref_str, narr=narr, summary=summary,
-                mc=mc, outputs=outputs)
+    return dict(session=session, ref=archive_date_str, market_ref=ref_str, title=report_title,
+                narr=narr, summary=summary, mc=mc, outputs=outputs)
 
 
 def build_digest(session, yf_data, kr_idx, mc, money, summary, breadth):
@@ -487,11 +507,15 @@ def build_digest(session, yf_data, kr_idx, mc, money, summary, breadth):
 # ══════════════════════════════════════════════════════════════
 def render(session, ref, now, yf_data, kr_idx, kr_stk, money,
            charts_us, charts_kr, summary, mc, breadth, flows, narr, theme="coinbase", rs=None, src=None,
-           credit_interp=None, fed_odds=None, src_list=None, aitech_md=None, aitech_date=None):
+           credit_interp=None, fed_odds=None, src_list=None, aitech_md=None, aitech_date=None, gap_info=None):
     css = themes.get_css(theme, CSS)
     kr_all = {**kr_idx, **kr_stk}
-    title = "미국 증시 마감 브리핑" if session == "us" else "한국 증시 마감 브리핑"
-    sess_en = "US Market Close" if session == "us" else "KR Market Close"
+    if gap_info:
+        title = gap_info["title"]
+        sess_en = "KR Pre-Market"
+    else:
+        title = "미국 증시 마감 브리핑" if session == "us" else "한국 증시 마감 브리핑"
+        sess_en = "US Market Close" if session == "us" else "KR Market Close"
 
     # ── 예탁금/신용 ──
     def cho(v): return f"{float(v)/10000:.1f}조"
@@ -606,7 +630,7 @@ def render(session, ref, now, yf_data, kr_idx, kr_stk, money,
         <div class="sv num">{kospi_pos}</div><div class="sc mut">신용 {sinyong}</div></div>'''
 
     return f"""<meta charset="utf-8">
-<title>{title} · {ref}</title>
+<title>{title} · {gap_info['display_date'] if gap_info else ref}</title>
 <style>
 {css}
 </style>
@@ -615,7 +639,7 @@ def render(session, ref, now, yf_data, kr_idx, kr_stk, money,
   <div class="hero-in">
     <div class="eb">{sess_en}</div>
     <h1>{title}</h1>
-    <div class="hsub">데이터 기준일 {ref} · 생성 {now} · 미국 · 한국 증시 자동 분석</div>
+    <div class="hsub">{f"시장 데이터는 직전 개장일({gap_info['market_ref']}) 기준 · " if gap_info else ""}생성 {now} · 미국 · 한국 증시 자동 분석</div>
     <div class="stat-cards">{hero_cards}</div>
   </div>
 </div>
