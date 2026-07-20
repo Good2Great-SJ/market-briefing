@@ -158,7 +158,7 @@ def recheck_pending_updates(now_sgt=None):
     if not os.path.isdir(MARKER_DIR):
         return updated
 
-    import sources, briefing
+    import sources, briefing, ai_tech
     for fn in sorted(os.listdir(MARKER_DIR)):
         if not fn.endswith(".pending.json"):
             continue
@@ -172,27 +172,42 @@ def recheck_pending_updates(now_sgt=None):
         # status가 바뀌어도(naver-blog-kakao-notifier가 재시도를 포기해도) 자막
         # 없이 설명란만으로 확정된 경우엔 내용이 그대로라 다시 빌드해봐야 무의미
         # 하다 — 실제로 분량이 늘어난 경우만 "해결됨"으로 본다.
-        still_pending, resolved = {}, False
+        still_pending, resolved, reasons = {}, False, []
         for pid, baseline_len in marker["pending"].items():
             post = sources.get_post_by_id(pid)
             rclen = len(post.get("raw_content") or "") if post else baseline_len
             if post and post.get("status") != "transcript_pending" and rclen > baseline_len + 100:
                 resolved = True
+                reasons.append("자막 반영")
             else:
                 still_pending[pid] = baseline_len
 
+        aitech_still_missing = marker.get("aitech_missing", False)
+        if aitech_still_missing:
+            src_date = datetime.date.fromisoformat(marker["source_date"])
+            aitech_md, _ = ai_tech.get_ai_tech_markdown(marker["session"], src_date)
+            if aitech_md:
+                resolved = True
+                aitech_still_missing = False
+                reasons.append("AI-Tech 반영")
+
         if resolved:
-            print(f"[재발행] {marker['session']} {marker['archive_date']} — 지연 자막 입수, 리포트 갱신")
+            print(f"[재발행] {marker['session']} {marker['archive_date']} — {' · '.join(reasons)}, 리포트 갱신")
             src_date = datetime.date.fromisoformat(marker["source_date"])
             result = briefing.build(session=marker["session"], theme=marker.get("theme", "coinbase"),
                                      make_pdf=False, source_date=src_date)
             _, _, _, _, viewer_url = result["outputs"][0]
-            _send_report_email(marker["session"], result, viewer_url, note="자막 반영 갱신")
+            _send_report_email(marker["session"], result, viewer_url, note=" · ".join(reasons))
             updated.append((marker["session"], marker["archive_date"]))
+            # briefing.build()가 이 재빌드 결과를 바탕으로 마커 파일 자체를 이미
+            # 새로 쓰거나(다른 원천이 여전히 대기 중) 지웠으므로(전부 해결) 여기서
+            # 다시 건드리지 않는다 — 안 그러면 재빌드 이전의 낡은 상태로 덮어써버린다.
+            continue
 
         elapsed_h = (now_sgt - datetime.datetime.fromisoformat(marker["first_seen"])).total_seconds() / 3600
-        if still_pending and elapsed_h < PENDING_RETRY_HOURS:
+        if (still_pending or aitech_still_missing) and elapsed_h < PENDING_RETRY_HOURS:
             marker["pending"] = still_pending
+            marker["aitech_missing"] = aitech_still_missing
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(marker, f, ensure_ascii=False)
         else:
