@@ -161,8 +161,11 @@ def chart_b64(df, name, n=130):
         if full.notna().any():
             ax.plot(idx, full, color=col, lw=1.1, alpha=.95, label=f"MA{p}", zorder=5)
     ax.xaxis_date()
-    ax.set_title(name, fontsize=11, fontweight="600", color="#0a0b0d", pad=6, loc="left")
-    ax.legend(fontsize=6.6, loc="upper left", frameon=False, ncol=3,
+    ax.set_title(name, fontsize=11, fontweight="600", color="#0a0b0d", pad=10, loc="left")
+    # 일부 종목(비트코인 등, y축 자릿수·데이터 범위가 달라 tight_layout 계산이 달라지는
+    # 경우)은 legend가 upper-left 타이틀과 겹쳐 글자가 뭉개져 보이는 문제가 있었다.
+    # bbox_to_anchor로 y를 살짝 내려 항상 여백을 확보한다.
+    ax.legend(fontsize=6.6, loc="upper left", bbox_to_anchor=(0, 0.96), frameon=False, ncol=3,
               handlelength=1.1, columnspacing=.9, labelcolor="#7c828a")
     ax.grid(True, axis="y", alpha=1, lw=.7, color="#eef0f3")
     ax.tick_params(labelsize=6.8, colors="#7c828a", length=0)
@@ -406,6 +409,17 @@ def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None,
     else:
         print(f"  (기대 날짜: {want_date.isoformat()})")
         src = srcmod.get_sources_for_label_date(want_date, session)
+    # 자막을 못 가져와 설명란(디스클레이머 등)만으로 채워진 채 이미 확정된 항목은
+    # (naver-blog-kakao-notifier가 재시도를 포기하면 status가 더 이상
+    # transcript_pending이 아니게 되어 마커 대상에서도 빠진다) 총평 생성에
+    # 그대로 흘려보내면 근거 없는/부정확한 총평이 나올 수 있다 — 최소 분량 미만이면
+    # 총평용으로는 쓰지 않는다("주요 블로그 및 영상" 목록에는 그대로 노출된다).
+    MIN_NARRATIVE_CHARS = 300
+    src_raw = dict(src)  # 마커(재발행 감지)는 필터 전 원본 status 기준으로 판단해야 하므로 보존
+    for k, v in list(src.items()):
+        if v and len(v.get("raw_content") or "") < MIN_NARRATIVE_CHARS:
+            print(f"  ! {k}: 원문이 {len(v.get('raw_content') or '')}자뿐이라 총평 근거에서 제외")
+            src[k] = None
     for k, v in src.items():
         print(f"  - {k}:", v["title"][:40] if v else "없음(미발행)")
     src_list = srcmod.list_recent_sources(session, ref_date, want_date_override=source_date)
@@ -440,19 +454,25 @@ def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None,
         gap_info = dict(display_date=archive_date_str, weekday_kr=weekday_kr, market_ref=ref_str, title=report_title)
 
     # 매칭된 원천(버터대디/증시각도기) 중 자막이 아직 안 붙어 설명란으로만
-    # 채워진(status=transcript_pending) 게 있으면, 나중에 자막이 늦게 들어왔을 때
-    # trigger.py가 이 리포트를 자동으로 재발행할 수 있도록 마커를 남겨둔다.
+    # 채워진(status=transcript_pending) 게 있거나, AI-Tech 뉴스 파일이 아직
+    # 발행 전이면, 나중에 늦게 들어왔을 때 trigger.py가 이 리포트를 자동으로
+    # 재발행할 수 있도록 마커를 남겨둔다.
     pending = {v["post_id"]: len(v.get("raw_content") or "")
-               for v in src.values() if v and v.get("status") == "transcript_pending"}
+               for v in src_raw.values() if v and v.get("status") == "transcript_pending"}
+    aitech_missing = aitech_md is None
     marker_dir = os.path.join("out", ".triggers")
     marker_path = os.path.join(marker_dir, f"{session}_{archive_date_str}.pending.json")
-    if pending:
+    if pending or aitech_missing:
         os.makedirs(marker_dir, exist_ok=True)
         with open(marker_path, "w", encoding="utf-8") as f:
             json.dump(dict(session=session, theme=theme, source_date=want_date.isoformat(),
                            archive_date=archive_date_str, pending=pending,
+                           aitech_missing=aitech_missing,
                            first_seen=datetime.datetime.now(KST).isoformat()), f, ensure_ascii=False)
-        print(f"  (자막 대기 중인 원천 {len(pending)}건 — 추후 자동 재발행 대상으로 표시)")
+        reasons = []
+        if pending: reasons.append(f"자막 대기 {len(pending)}건")
+        if aitech_missing: reasons.append("AI-Tech 미발행")
+        print(f"  ({' · '.join(reasons)} — 추후 자동 재발행 대상으로 표시)")
     elif os.path.exists(marker_path):
         os.remove(marker_path)
 
