@@ -238,6 +238,26 @@ def has_any(sources):
     return bool(sources) and any(sources.values())
 
 
+def get_post_by_id(post_id):
+    """단일 post_id의 현재 DB 상태를 조회한다.
+
+    라이브 방송 등은 처음 수집될 때 자막이 아직 없어 status=transcript_pending으로
+    설명란만 채워둔 채 저장되고, naver-blog-kakao-notifier의 retry_pending_transcripts가
+    나중에 실제 자막을 채워 status=collected로 승격시킨다. trigger.py가 이 상태 변화를
+    감지해 총평에 반영이 덜 된 리포트를 재발행할 때 쓴다.
+    """
+    if not os.path.exists(DB_PATH):
+        return None
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    row = conn.execute(
+        "SELECT post_id, blog_id, title, url, published_at, summary, raw_content, status "
+        "FROM posts WHERE post_id = ?", (post_id,)
+    ).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
 MAX_RAW_CHARS = 8000
 
 

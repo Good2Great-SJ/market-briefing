@@ -1,0 +1,47 @@
+name: Deploy Pages
+
+# docs/(리포트 아카이브 + manifest.json)가 바뀔 때마다 GitHub Actions로 직접
+# 배포한다. 기존 "저장소 설정 → Pages → Deploy from a branch" 방식은 GitHub
+# 내부 백그라운드 큐를 타서 반영까지 몇 분~10분 넘게 걸리기도 했는데,
+# actions/deploy-pages를 쓰면 워크플로우가 끝나는 즉시(보통 1분 이내) 반영된다.
+# briefing.yml(트리거 체크)이 docs/를 커밋·푸시하면 이 워크플로우가 뒤이어 자동
+# 실행되고, 로컬에서 수동으로 push해도 동일하게 즉시 배포된다.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout market-briefing
+        uses: actions/checkout@v4
+        with:
+          path: market-briefing
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload docs/ as Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: market-briefing/docs
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
