@@ -104,7 +104,7 @@ def check_and_run(now_sgt=None, dry_run=False):
         reason = "source_ready" if has_source else "hardstop_fallback"
         print(f"[{session}] 트리거 발동 (사유: {reason}) — 브리핑 생성 시작")
         if not dry_run:
-            import briefing, delivery
+            import briefing
             # source_date=today_kst: 위에서 이미 today_kst 기준으로 소스 존재를
             # 확인해 트리거를 발동시켰으므로, 실제 빌드도 같은 날짜로 소스를 찾게
             # 한다. 주말 등 거래일 공백 직후(예: 월요일)에는 시장 데이터 기준일
@@ -116,19 +116,27 @@ def check_and_run(now_sgt=None, dry_run=False):
             _mark_done(session, date_str, reason)
             _, fn, pdf, report_url, viewer_url = result["outputs"][0]
             fired.append((session, reason, fn))
-
-            try:
-                subject = f"[{result['title']}] {result['ref']}"
-                body = delivery.build_email_body(
-                    session, result["ref"], result["narr"], result["summary"], result["mc"],
-                    link_url=viewer_url or "")
-                delivery.send_email(subject, body, [])
-                print(f"  → 이메일 발송 완료 ({subject})")
-            except Exception as e:
-                print("  ! 이메일 발송 실패:", repr(e)[:200])
+            _send_report_email(session, result, viewer_url)
         else:
             fired.append((session, reason, None))
     return fired
+
+
+def _send_report_email(session, result, viewer_url, note=None):
+    """리포트가 새로 생성/재발행될 때마다 이메일도 함께 보낸다.
+
+    note가 있으면(자막 지연 재발행 등) 제목에 덧붙여 일반 발행과 구분한다.
+    """
+    import delivery
+    try:
+        subject = f"[{result['title']}] {result['ref']}" + (f" ({note})" if note else "")
+        body = delivery.build_email_body(
+            session, result["ref"], result["narr"], result["summary"], result["mc"],
+            link_url=viewer_url or "")
+        delivery.send_email(subject, body, [])
+        print(f"  → 이메일 발송 완료 ({subject})")
+    except Exception as e:
+        print("  ! 이메일 발송 실패:", repr(e)[:200])
 
 
 PENDING_RETRY_HOURS = 6  # naver-blog-kakao-notifier의 TRANSCRIPT_RETRY_HOURS(자막 재시도 포기 시한)과 맞춤
@@ -176,8 +184,10 @@ def recheck_pending_updates(now_sgt=None):
         if resolved:
             print(f"[재발행] {marker['session']} {marker['archive_date']} — 지연 자막 입수, 리포트 갱신")
             src_date = datetime.date.fromisoformat(marker["source_date"])
-            briefing.build(session=marker["session"], theme=marker.get("theme", "coinbase"),
-                            make_pdf=False, source_date=src_date)
+            result = briefing.build(session=marker["session"], theme=marker.get("theme", "coinbase"),
+                                     make_pdf=False, source_date=src_date)
+            _, _, _, _, viewer_url = result["outputs"][0]
+            _send_report_email(marker["session"], result, viewer_url, note="자막 반영 갱신")
             updated.append((marker["session"], marker["archive_date"]))
 
         elapsed_h = (now_sgt - datetime.datetime.fromisoformat(marker["first_seen"])).total_seconds() / 3600
