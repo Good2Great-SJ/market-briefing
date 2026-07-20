@@ -288,20 +288,19 @@ def list_recent_sources(session, ref_date, include_gap_day=True, want_date_overr
     총평 생성에 실제로 쓰인 것 외에도, 해당 세션의 '기대 날짜'까지 올라온
     글/영상을 전부 보여주기 위한 용도(리포트의 '수집 현황' 섹션).
 
-    월요일처럼 want 바로 전날이 휴장일(주말·공휴일)이면 콘텐츠 창작자들도 그날은
-    쉬는 경우가 많아, 그 전날 하루치까지만 포함한다(요일에 상관없이 일반화된 규칙 —
-    예: 화요일인데 월요일이 공휴일이었다면 화요일 리포트에 월요일 글도 포함).
-    단, 그 전날이 또 그 전날의 휴장일이어도 이틀 이상 거슬러 올라가진 않는다
-    (월요일 리포트에 토요일까지 넣으면 범위가 너무 넓어진다는 피드백으로 하루만 포함).
+    오전(us) 리포트는 전날 하루치도 함께 포함한다 — 미국장 마감 관련 글/영상은
+    발행 시점이 KST 자정 전후로 걸치는 경우가 많아(마감 직후 늦은 밤에 올리는
+    소스도 있고 다음날 아침에 올리는 소스도 있어), want 하루만 보면 놓치는
+    경우가 생긴다. 반대로 오후(kr) 리포트는 한국장이 그날 마감·그날 바로
+    콘텐츠가 나오는 게 보통이라 그날 것만 포함한다(전날 포함 시 불필요하게
+    범위가 넓어짐).
     want_date_override: 지정하면 '기대 날짜'를 이 날짜로 대체한다(거래일 갭으로
     expected_date()가 실제 오늘과 어긋날 때 사용).
     """
-    import calendars
     want = want_date_override or expected_date(session, ref_date)
     start = want
-    prev_day = want - datetime.timedelta(days=1)
-    if include_gap_day and calendars.is_kr_market_holiday(prev_day):
-        start = prev_day
+    if include_gap_day and session == "us":
+        start = want - datetime.timedelta(days=1)
 
     out = []
     for blog_id, label in _all_tracked_ids().items():
