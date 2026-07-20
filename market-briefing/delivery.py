@@ -179,10 +179,20 @@ def build_email_html(title, ref, narr, summary, mc, link_url=""):
 
     cta = ""
     if link_url:
+        # <a> 태그에 직접 padding/border-radius를 주면 클라이언트에 따라(특히
+        # 일부 웹메일) 안 먹혀서 버튼이 찌그러지거나 글자가 잘려 보이는 경우가
+        # 있다 — 배경·모양은 <td>에 주고 <a>는 그 안을 꽉 채우기만 하는
+        # "안전한 버튼" 패턴으로 바꿔 어느 클라이언트에서도 크기가 안정적이게 함.
+        safe_url = link_url.replace('&', '&amp;')
         cta = f'''<tr><td style="padding:8px 0 0" align="center">
-          <a href="{link_url.replace('&', '&amp;')}" style="display:inline-block;background:{_CB_PRIMARY};color:#fff;
-             font-size:14px;font-weight:600;text-decoration:none;padding:13px 28px;border-radius:100px">
-            웹에서 전체 리포트 보기 →</a></td></tr>'''
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto">
+            <tr><td style="background:{_CB_PRIMARY};border-radius:10px" align="center">
+              <a href="{safe_url}" style="display:block;color:#fff;font-size:14px;font-weight:600;
+                 text-decoration:none;padding:14px 30px;white-space:nowrap">
+                웹에서 전체 리포트 보기 →</a>
+            </td></tr>
+          </table>
+        </td></tr>'''
 
     return f'''<!doctype html><html><body style="margin:0;padding:0;background:{_CB_SOFT};
       font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Malgun Gothic',sans-serif">
