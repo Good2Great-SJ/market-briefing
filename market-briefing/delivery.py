@@ -207,11 +207,14 @@ def build_email_html(title, ref, narr, summary, mc, link_url=""):
         # 있다 — 배경·모양은 <td>에 주고 <a>는 그 안을 꽉 채우기만 하는
         # "안전한 버튼" 패턴으로 바꿔 어느 클라이언트에서도 크기가 안정적이게 함.
         safe_url = link_url.replace('&', '&amp;')
+        # display:block으로 했더니 <a>가 부모 폭에 맞춰 카드 전체 너비로 늘어나
+        # 버튼이 과도하게 커 보였다 — inline-block으로 바꿔 내용 크기에 맞게
+        # 딱 맞는 크기로 렌더링되게 함(그래도 padding/줄바꿈 방지는 유지).
         cta = f'''<tr><td style="padding:8px 0 0" align="center">
-          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto">
+          <table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:0 auto">
             <tr><td style="background:{_CB_PRIMARY};border-radius:10px" align="center">
-              <a href="{safe_url}" style="display:block;color:#fff;font-size:14px;font-weight:600;
-                 text-decoration:none;padding:14px 30px;white-space:nowrap">
+              <a href="{safe_url}" style="display:inline-block;color:#fff;font-size:14px;font-weight:600;
+                 text-decoration:none;padding:13px 26px;white-space:nowrap">
                 웹에서 전체 리포트 보기 →</a>
             </td></tr>
           </table>
