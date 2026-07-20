@@ -287,14 +287,15 @@ def list_recent_sources(session, ref_date, monday_includes_weekend=True, want_da
     리포트 데이터 기준일까지 수집되어 있는 원문 글/영상 목록(최신순).
     총평 생성에 실제로 쓰인 것 외에도, 해당 세션의 '기대 날짜'까지 올라온
     글/영상을 전부 보여주기 위한 용도(리포트의 '수집 현황' 섹션).
-    월요일 리포트는 주말(토·일) 동안 올라온 글도 함께 포함한다.
+    월요일 리포트는 일요일 동안 올라온 글도 함께 포함한다(토요일까지 넣으면
+    범위가 너무 넓어져 목록이 과도하게 길어진다는 피드백으로 하루만 포함).
     want_date_override: 지정하면 '기대 날짜'를 이 날짜로 대체한다(거래일 갭으로
     expected_date()가 실제 오늘과 어긋날 때 사용).
     """
     want = want_date_override or expected_date(session, ref_date)
     start = want
     if monday_includes_weekend and want.weekday() == 0:  # 월요일
-        start = want - datetime.timedelta(days=2)
+        start = want - datetime.timedelta(days=1)
 
     out = []
     for blog_id, label in _all_tracked_ids().items():
