@@ -37,10 +37,16 @@ def _spaced_paragraphs(text):
     return "\n\n".join(parts)
 
 
-def build_email_body(session, ref, narr, summary, mc, link_url=""):
-    """이메일 본문. 총평(소스별 분리, 전문) + 핵심 지표 + 리포트 링크."""
-    label = "미국 증시 마감" if session == "us" else "한국 증시 마감"
-    lines = [f"[{label} 브리핑] {ref}", ""]
+def build_email_body(title, ref, narr, summary, mc, link_url=""):
+    """이메일 본문. 총평(소스별 분리, 전문) + 핵심 지표 + 리포트 링크.
+
+    title: 제목 줄에 그대로 쓸 리포트 제목(예: "한국 증시 마감 브리핑" 또는
+    거래일 공백 시의 "N월 N일(월) 한국증시 장전 리포트"). session에서 다시
+    유추하지 않는 이유는, 예전엔 여기서 session만 보고 "미국/한국 증시 마감"으로
+    고정해 만들어서 장전 리포트처럼 제목이 달라지는 경우 메일 제목(subject)과
+    본문 첫 줄이 서로 다르게 나가던 문제가 있었기 때문이다.
+    """
+    lines = [f"[{title}] {ref}", ""]
     bd = narr.get("butterdaddy_analysis") if narr else None
     jg = narr.get("jeungsi_analysis") if narr else None
     if bd or jg:

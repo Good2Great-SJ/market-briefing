@@ -121,13 +121,13 @@ def check_and_run(now_sgt=None, dry_run=False):
                 continue
             _, fn, pdf, report_url, viewer_url = result["outputs"][0]
             fired.append((session, reason, fn))
-            _send_report_email(session, result, viewer_url)
+            _send_report_email(result, viewer_url)
         else:
             fired.append((session, reason, None))
     return fired
 
 
-def _send_report_email(session, result, viewer_url, note=None):
+def _send_report_email(result, viewer_url, note=None):
     """리포트가 새로 생성/재발행될 때마다 이메일도 함께 보낸다.
 
     note가 있으면(자막 지연 재발행 등) 제목에 덧붙여 일반 발행과 구분한다.
@@ -136,7 +136,7 @@ def _send_report_email(session, result, viewer_url, note=None):
     try:
         subject = f"[{result['title']}] {result['ref']}" + (f" ({note})" if note else "")
         body = delivery.build_email_body(
-            session, result["ref"], result["narr"], result["summary"], result["mc"],
+            result["title"], result["ref"], result["narr"], result["summary"], result["mc"],
             link_url=viewer_url or "")
         delivery.send_email(subject, body, [])
         print(f"  → 이메일 발송 완료 ({subject})")
@@ -206,7 +206,7 @@ def recheck_pending_updates(now_sgt=None):
                 os.remove(path)
                 continue
             _, _, _, _, viewer_url = result["outputs"][0]
-            _send_report_email(marker["session"], result, viewer_url, note=" · ".join(reasons))
+            _send_report_email(result, viewer_url, note=" · ".join(reasons))
             updated.append((marker["session"], marker["archive_date"]))
             # briefing.build()가 이 재빌드 결과를 바탕으로 마커 파일 자체를 이미
             # 새로 쓰거나(다른 원천이 여전히 대기 중) 지웠으므로(전부 해결) 여기서
