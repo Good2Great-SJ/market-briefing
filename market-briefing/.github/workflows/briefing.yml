@@ -76,5 +76,14 @@ jobs:
           # 스킵되어 리포트가 커밋만 되고 실제 사이트에는 반영이 안 된다(2026-07-20
           # 실제 발생). Trigger Check 자신은 on: push가 없어 재귀 트리거 걱정이
           # 없으므로 [skip ci]를 뺀다.
-          git diff --cached --quiet || git commit -m "chore: 데일리 브리핑 자동 생성"
-          git push
+          # 커밋할 변경사항이 없으면(이미 발행된 세션이라 트리거가 아무것도 안 만든 경우)
+          # push 자체를 건너뛴다 — 안 그러면 그 사이 다른 곳(예: 로컬 수동 push)에서
+          # origin/main이 앞서 나간 경우 이 무의미한 push가 non-fast-forward로 실패해
+          # 잡 전체가 실패 처리된다(2026-07-20 실제 발생, 데이터 손실은 없었음).
+          if git diff --cached --quiet; then
+            echo "커밋할 변경 없음 — push 생략"
+          else
+            git commit -m "chore: 데일리 브리핑 자동 생성"
+            git pull --rebase --autostash origin main
+            git push
+          fi
