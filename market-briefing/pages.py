@@ -7,6 +7,8 @@ GitHub Pages 리포트 아카이브 발행.
 """
 import os, json, shutil, datetime
 
+KST = datetime.timezone(datetime.timedelta(hours=9))
+
 _ROOT = os.path.dirname(__file__)
 _DOCS = os.path.join(_ROOT, "docs")
 _REPORTS = os.path.join(_DOCS, "reports")
@@ -43,7 +45,10 @@ def publish_report(session, theme, date_str, html_path, title=None):
     entry = dict(
         session=session, date=date_str, theme=theme,
         path=f"reports/{fname}",
-        generated_at=datetime.datetime.now().isoformat(timespec="seconds"),
+        # naive datetime.now()는 실행 환경(로컬 vs GitHub Actions 러너=UTC)에 따라
+        # 시간대가 달라 같은 날짜 안에서 정렬 순서가 실제 발행 순서와 어긋날 수
+        # 있었다(2026-07-20 실제 발생) — 항상 KST로 고정한다.
+        generated_at=datetime.datetime.now(KST).isoformat(timespec="seconds"),
     )
     if title:
         entry["title"] = title
