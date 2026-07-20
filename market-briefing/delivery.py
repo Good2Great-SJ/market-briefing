@@ -84,6 +84,129 @@ def build_email_body(title, ref, narr, summary, mc, link_url=""):
     return "\n".join(lines)
 
 
+_CB_INK = "#0a0b0d"
+_CB_BODY = "#5b616e"
+_CB_MUTED = "#7c828a"
+_CB_HAIR = "#dee1e6"
+_CB_SOFT = "#f7f7f7"
+_CB_PRIMARY = "#0052ff"
+_CB_UP = "#cf202f"
+
+
+def _html_escape(s):
+    return (str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
+
+
+def _html_paragraphs(text):
+    parts = [p.strip() for p in text.split("\n") if p.strip()]
+    return "".join(
+        f'<p style="margin:0 0 14px;font-size:14.5px;line-height:1.7;color:{_CB_INK}">{_html_escape(p)}</p>'
+        for p in parts
+    )
+
+
+def build_email_html(title, ref, narr, summary, mc, link_url=""):
+    """리포트 웹페이지와 동일한 코인베이스 톤(흰 배경, #0052ff 포인트, 카드형
+    섹션)으로 이메일 HTML 버전을 만든다. send_email(html_body=...)에 넘기면
+    지원 클라이언트에서는 이 버전이, 미지원 클라이언트에서는 build_email_body의
+    텍스트 버전이 자동으로 대체 표시된다."""
+    sections = []
+
+    bd = narr.get("butterdaddy_analysis") if narr else None
+    jg = narr.get("jeungsi_analysis") if narr else None
+
+    def _src_card(label, text):
+        return f'''<tr><td style="padding:0 0 16px">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                 style="background:#fff;border:1px solid {_CB_HAIR};border-radius:14px">
+            <tr><td style="padding:20px 22px">
+              <div style="font-size:12px;font-weight:700;letter-spacing:.04em;color:{_CB_PRIMARY};
+                          text-transform:uppercase;margin-bottom:10px">{_html_escape(label)}</div>
+              {_html_paragraphs(text)}
+            </td></tr>
+          </table></td></tr>'''
+
+    if bd or jg:
+        if bd:
+            sections.append(_src_card("버터대디 총평", bd))
+        if jg:
+            sections.append(_src_card("증시각도기 총평", jg))
+    elif narr and narr.get("overview"):
+        sections.append(_src_card("오늘의 총평", narr["overview"]))
+    else:
+        sections.append(_src_card(
+            "오늘의 총평",
+            f"상승 {summary['n_up']} / 하락 {summary['n_dn']} · "
+            f"정배열 {summary['arr_g']} / 역배열 {summary['arr_r']}"))
+
+    if narr and narr.get("checkpoints"):
+        items = "".join(
+            f'<li style="margin:0 0 8px;font-size:14px;line-height:1.6;color:{_CB_INK}">{_html_escape(c)}</li>'
+            for c in narr["checkpoints"])
+        sections.append(f'''<tr><td style="padding:0 0 16px">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                 style="background:{_CB_SOFT};border-radius:14px">
+            <tr><td style="padding:18px 22px">
+              <div style="font-size:12px;font-weight:700;letter-spacing:.04em;color:{_CB_MUTED};
+                          text-transform:uppercase;margin-bottom:10px">체크포인트</div>
+              <ul style="margin:0;padding-left:18px">{items}</ul>
+            </td></tr>
+          </table></td></tr>''')
+
+    if "KOSPI" in mc:
+        sections.append(f'''<tr><td style="padding:0 0 16px;font-size:13.5px;color:{_CB_BODY}">
+          코스피 시총 5년내 <b style="color:{_CB_INK}">{mc['KOSPI']['pct5']:.0f}%</b> 수준
+          (버핏지수 {mc.get('buffett', float('nan')):.0f}%)</td></tr>''')
+
+    if narr and narr.get("calendar"):
+        rows = "".join(
+            f'''<tr>
+              <td style="padding:7px 0;border-bottom:1px solid {_CB_HAIR};font-size:13px;
+                         color:{_CB_PRIMARY};font-weight:600;white-space:nowrap;vertical-align:top">
+                {_html_escape(c.get('date',''))}</td>
+              <td style="padding:7px 0 7px 12px;border-bottom:1px solid {_CB_HAIR};font-size:13px;color:{_CB_INK}">
+                {_html_escape(c.get('event',''))}</td>
+            </tr>''' for c in narr["calendar"])
+        sections.append(f'''<tr><td style="padding:0 0 16px">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                 style="background:#fff;border:1px solid {_CB_HAIR};border-radius:14px">
+            <tr><td style="padding:18px 22px">
+              <div style="font-size:12px;font-weight:700;letter-spacing:.04em;color:{_CB_MUTED};
+                          text-transform:uppercase;margin-bottom:10px">다가오는 일정</div>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">{rows}</table>
+            </td></tr>
+          </table></td></tr>''')
+
+    cta = ""
+    if link_url:
+        cta = f'''<tr><td style="padding:8px 0 0" align="center">
+          <a href="{link_url.replace('&', '&amp;')}" style="display:inline-block;background:{_CB_PRIMARY};color:#fff;
+             font-size:14px;font-weight:600;text-decoration:none;padding:13px 28px;border-radius:100px">
+            웹에서 전체 리포트 보기 →</a></td></tr>'''
+
+    return f'''<!doctype html><html><body style="margin:0;padding:0;background:{_CB_SOFT};
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Malgun Gothic',sans-serif">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{_CB_SOFT}">
+        <tr><td align="center" style="padding:32px 16px">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px">
+            <tr><td style="padding:0 4px 22px">
+              <div style="font-size:12px;font-weight:700;letter-spacing:.06em;color:{_CB_PRIMARY};
+                          text-transform:uppercase;margin-bottom:6px">📖 Good To Great</div>
+              <div style="font-size:22px;font-weight:700;letter-spacing:-.01em;color:{_CB_INK}">
+                {_html_escape(title)}</div>
+              <div style="font-size:13px;color:{_CB_MUTED};margin-top:4px">{_html_escape(ref)}</div>
+            </td></tr>
+            {"".join(sections)}
+            {cta}
+            <tr><td style="padding:24px 4px 0;font-size:11.5px;color:{_CB_MUTED};
+                          border-top:1px solid {_CB_HAIR};margin-top:8px">
+              자동 생성된 리포트입니다 · yfinance · FinanceDataReader · Claude
+            </td></tr>
+          </table>
+        </td></tr>
+      </table></body></html>'''
+
+
 def send_email(subject, body_text, pdf_paths, to_addr=None, html_body=None):
     """
     PDF를 첨부해 이메일로 발송한다. .env에 아래 값이 필요:
