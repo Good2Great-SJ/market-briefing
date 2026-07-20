@@ -307,11 +307,18 @@ def _truncate_to_date(data, cutoff):
     return out
 
 
-def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None):
+def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None, source_date=None):
     """
     historical_date: datetime.date | 'YYYY-MM-DD' 문자열. 지정하면 그 날짜 마감 기준
     데이터로 과거 시점 리포트를 재현한다(예: 특정 날짜의 버터대디/증시각도기 콘텐츠에
     맞춰 리포트를 다시 만들고 싶을 때). 생략하면 항상 최신 데이터를 사용한다.
+
+    source_date: 원천 콘텐츠(버터대디/증시각도기) 매칭에 쓸 날짜를 직접 지정한다.
+    생략하면 기존처럼 ref_date+1(us)/ref_date(kr) 공식으로 자동 계산하는데, 주말
+    등으로 거래일 공백이 생기면(예: 금요일 마감 이후 새 거래일 없이 월요일이 되는
+    경우) 이 공식이 "오늘"과 어긋날 수 있다. trigger.py는 실행 시점의 실제 오늘
+    날짜로 소스 존재 여부를 먼저 확인하므로, 그 날짜를 여기 그대로 넘겨 실제 빌드에
+    쓰이는 소스와 트리거 판단에 쓰인 소스가 어긋나지 않게 한다.
     """
     session = resolve_session(session)
     print(f"■ 세션: {'미국 증시 마감' if session=='us' else '한국 증시 마감'} · 테마: {theme}"
@@ -387,12 +394,12 @@ def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None)
 
     # 원천 콘텐츠 (버터대디/증시각도기)
     print("· 원천 콘텐츠 확인 (버터대디/증시각도기)…")
-    want_date = srcmod.expected_date(session, ref_date)
+    want_date = source_date or srcmod.expected_date(session, ref_date)
     print(f"  (기대 날짜: {want_date.isoformat()})")
-    src = srcmod.get_session_sources(session, ref_date)
+    src = srcmod.get_sources_for_label_date(want_date, session)
     for k, v in src.items():
         print(f"  - {k}:", v["title"][:40] if v else "없음(미발행)")
-    src_list = srcmod.list_recent_sources(session, ref_date)
+    src_list = srcmod.list_recent_sources(session, ref_date, want_date_override=source_date)
 
     print("· AI-Tech 뉴스 확인…")
     aitech_md, aitech_date = ai_tech.get_ai_tech_markdown(session, datetime.datetime.now(KST).date())
