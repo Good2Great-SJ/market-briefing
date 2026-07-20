@@ -135,7 +135,10 @@ def build_email_body(start, end, items, digest, counted_keywords):
     summary = (digest or {}).get("week_summary")
     if summary:
         lines.append("■ 한 주 총평")
-        lines.append(summary.strip())
+        # 단락이 줄바꿈 하나로만 구분돼 있으면 텍스트 메일에서 다 붙어 보인다 —
+        # 빈 줄로 재구성(daily 리포트 이메일과 동일한 이유로 동일하게 적용).
+        parts = [p.strip() for p in summary.split("\n") if p.strip()]
+        lines.append("\n\n".join(parts))
         lines.append("")
 
     lines.append(f"수집 원문: 총 {len(items)}건 ({src_breakdown})")
