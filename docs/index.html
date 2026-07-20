@@ -127,7 +127,14 @@ async function loadManifest(bust){
     const url = "manifest.json" + (bust ? ("?t=" + Date.now()) : "");
     const res = await fetch(url, {cache: "no-store"});
     manifest = await res.json();
-    manifest.sort((a,b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (a.session < b.session ? 1 : -1)));
+    // 같은 날짜(예: 월요일 장전 리포트 + 그날 저녁 한국 마감 리포트) 안에서는
+    // session 알파벳 순(session 'us'가 항상 'kr'보다 앞으로 와 실제 발행 순서와
+    // 어긋났었다) 대신, 실제 생성 시각(generated_at) 기준 최신순으로 정렬한다.
+    manifest.sort((a,b) => {
+      if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+      const at = a.generated_at || "", bt = b.generated_at || "";
+      return at < bt ? 1 : at > bt ? -1 : 0;
+    });
     populate();
     statusEl.textContent = manifest.length ? `총 ${manifest.length}개 리포트` : "리포트 없음";
     return true;
