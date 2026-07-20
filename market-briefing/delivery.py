@@ -70,6 +70,13 @@ def build_email_body(title, ref, narr, summary, mc, link_url=""):
         for c in narr["checkpoints"]:
             lines.append(f"  - {c}")
         lines.append("")
+    if narr and narr.get("news"):
+        lines.append("시장 영향 뉴스")
+        for n in narr["news"]:
+            lines.append(f"  - {n.get('title','')}")
+            if n.get("impact"):
+                lines.append(f"    → {n['impact']}")
+        lines.append("")
     if "KOSPI" in mc:
         lines.append(f"코스피 시총 5년내 {mc['KOSPI']['pct5']:.0f}% 수준 "
                      f"(버핏지수 {mc.get('buffett', float('nan')):.0f}%)")
@@ -150,6 +157,22 @@ def build_email_html(title, ref, narr, summary, mc, link_url=""):
               <div style="font-size:12px;font-weight:700;letter-spacing:.04em;color:{_CB_MUTED};
                           text-transform:uppercase;margin-bottom:10px">체크포인트</div>
               <ul style="margin:0;padding-left:18px">{items}</ul>
+            </td></tr>
+          </table></td></tr>''')
+
+    if narr and narr.get("news"):
+        rows = "".join(
+            f'''<div style="padding:10px 0;border-bottom:1px solid {_CB_HAIR}">
+              <div style="font-size:13.5px;font-weight:600;color:{_CB_INK}">{_html_escape(n.get('title',''))}</div>
+              {f'<div style="font-size:12.5px;color:{_CB_MUTED};margin-top:3px">{_html_escape(n["impact"])}</div>' if n.get('impact') else ''}
+            </div>''' for n in narr["news"])
+        sections.append(f'''<tr><td style="padding:0 0 16px">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                 style="background:#fff;border:1px solid {_CB_HAIR};border-radius:14px">
+            <tr><td style="padding:18px 22px 4px">
+              <div style="font-size:12px;font-weight:700;letter-spacing:.04em;color:{_CB_MUTED};
+                          text-transform:uppercase;margin-bottom:6px">시장 영향 뉴스</div>
+              {rows}
             </td></tr>
           </table></td></tr>''')
 
