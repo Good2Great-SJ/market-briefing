@@ -221,6 +221,13 @@ def get_sources_for_range(start_date, end_date, session):
         if not candidates:
             return None
         candidates.sort(key=lambda c: c["published_at"], reverse=True)
+        # "장전"(프리마켓) 영상은 리포트 발행 당일 아침 상황을 가장 직접적으로
+        # 다루므로, "OO시황" 태그보다도 우선한다 — 특히 월요일 장전 리포트에서
+        # (구간 마지막 날 = 오늘 올라온 것만 해당, 주말 중 올라온 옛날 "장전" 글까지
+        # 끌어오지 않도록 end_date와 일치하는 것만 본다).
+        for c in candidates:
+            if re.search(r"장\s*전", c["title"]) and _row_effective_date(c) == end_date:
+                return c
         for c in candidates:
             if _title_session_hint(c["title"]) == session:
                 return c
