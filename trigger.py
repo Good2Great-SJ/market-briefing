@@ -55,7 +55,13 @@ def check_and_run(now_sgt=None, dry_run=False):
 
     fired = []
     for session, (start, hardstop) in WINDOWS.items():
-        if not (start <= t <= hardstop):
+        # start 이후라면 하드스톱을 넘겼어도 계속 체크한다(상한을 두지 않음).
+        # GitHub Actions cron은 실행 시각이 몇 분 밀리거나 아예 한 번 건너뛸 수
+        # 있는데, 하드스톱 시각을 상한으로 삼아 "그 순간 지나면 오늘은 포기"
+        # 하도록 짜여 있으면 그 한 번의 지연만으로 하루치 리포트가 통째로
+        # 누락된다. 이미 발행됐는지는 마커 파일로 걸러지므로 상한이 없어도
+        # 중복 발행 위험은 없다.
+        if t < start:
             continue
         if _already_done(session, date_str):
             continue
