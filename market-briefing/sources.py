@@ -207,6 +207,33 @@ def get_session_sources(session, ref_date):
     return get_sources_for_label_date(expected_date(session, ref_date), session)
 
 
+def get_sources_for_range(start_date, end_date, session):
+    """
+    [start_date, end_date] 구간에서 버터대디/증시각도기 각각 가장 관련성 높은
+    (세션 태그 일치 우선, 그다음 최신) 항목 하나씩을 찾는다.
+    거래일 공백(주말 등) 직후의 리포트에서 정확히 하루만 보면 놓치는 주말
+    콘텐츠까지 총평에 반영하기 위한 용도 — get_sources_for_label_date의
+    구간 버전.
+    """
+    def _best(blog_id):
+        candidates = [c for c in _fetch_candidates(blog_id)
+                      if start_date <= _row_effective_date(c) <= end_date]
+        if not candidates:
+            return None
+        candidates.sort(key=lambda c: c["published_at"], reverse=True)
+        for c in candidates:
+            if _title_session_hint(c["title"]) == session:
+                return c
+        for c in candidates:
+            if _matches_session(c, session):
+                return c
+        return candidates[0]  # 태그·시간대 매칭이 안 돼도 구간 안 최신 글은 채택(주말 예외라 관대하게)
+
+    bd = ensure_summary(_best(BUTTERDADDY_BLOG_ID))
+    jg = ensure_summary(_best(JEUNGSI_CHANNEL_ID))
+    return {"butterdaddy": bd, "증시각도기": jg}
+
+
 def has_any(sources):
     return bool(sources) and any(sources.values())
 

@@ -106,8 +106,7 @@ def check_and_run(now_sgt=None, dry_run=False):
             fired.append((session, reason, fn))
 
             try:
-                label = "미국 증시 마감" if session == "us" else "한국 증시 마감"
-                subject = f"[{label} 브리핑] {result['ref']}"
+                subject = f"[{result['title']}] {result['ref']}"
                 body = delivery.build_email_body(
                     session, result["ref"], result["narr"], result["summary"], result["mc"],
                     link_url=viewer_url or "")
