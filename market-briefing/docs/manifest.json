@@ -1,5 +1,12 @@
 [
   {
+    "session": "kr",
+    "date": "2026-07-21",
+    "theme": "coinbase",
+    "path": "reports/kr_coinbase_20260721.html",
+    "generated_at": "2026-07-21T19:27:37+09:00"
+  },
+  {
     "session": "us",
     "date": "2026-07-20-premarket",
     "theme": "coinbase",
@@ -13,7 +20,7 @@
     "date": "2026-07-20",
     "theme": "coinbase",
     "path": "reports/us_coinbase_20260720.html",
-    "generated_at": "2026-07-21T16:58:17+09:00"
+    "generated_at": "2026-07-21T19:29:28+09:00"
   },
   {
     "session": "kr",
