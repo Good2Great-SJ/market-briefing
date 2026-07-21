@@ -547,7 +547,12 @@ def build_digest(session, yf_data, kr_idx, mc, money, summary, breadth):
             m = compute(kr_idx[tk]); kr.append(f"{nm} {fmt_price(m['close'])}({m['chg']:+.2f}%)")
     L.append("한국: " + ", ".join(kr))
     if "KOSPI" in mc:
-        L.append(f"코스피 시총 {mc['KOSPI']['cur']/1e12:,.0f}조(5년내 {mc['KOSPI']['pct5']:.0f}%), "
+        # "5년내 X%"는 시가총액(상장주식수 증가로 구조적으로 우상향) 기준 백분위라
+        # 지수(포인트)가 고점보다 낮아도 높게 나올 수 있다 — "지수가 사상최고치/고점"
+        # 이라는 의미로 오해(총평 생성 AI가 실제로 이렇게 잘못 해석해 사실과 다른
+        # "사상 최고치" 표현을 지어낸 사고가 있었음)하지 않도록 라벨에 명시.
+        L.append(f"코스피 시가총액(상장주식수 증가 등 구조적 요인 포함, 지수 고점과는 별개) "
+                 f"{mc['KOSPI']['cur']/1e12:,.0f}조(5년내 시총 기준 백분위 {mc['KOSPI']['pct5']:.0f}%), "
                  f"버핏지수 {mc.get('buffett', float('nan')):.0f}%")
     if money is not None and len(money):
         r = money.iloc[0]
