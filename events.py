@@ -46,11 +46,14 @@ _BOK_2026 = [
 ]
 
 # 실적 발표를 추적할 대표 종목(과도한 API 호출 방지를 위해 대형주 위주로 제한).
+# is_foreign: 한국시간 환산 표시가 필요한 해외(미국 등) 상장 종목인지. 국내 상장
+# 종목은 yfinance의 발표 "시각" 자체가 신뢰할 수 없어(예: 삼성전자에 새벽 5시로
+# 나오는 등 실제와 다름) 날짜만 쓰고 시각 환산은 하지 않는다.
 _EARNINGS_TICKERS = [
-    ("AAPL", "애플"), ("MSFT", "마이크로소프트"), ("GOOGL", "구글"),
-    ("AMZN", "아마존"), ("META", "메타"), ("NVDA", "엔비디아"), ("TSLA", "테슬라"),
-    ("MU", "마이크론"), ("TSM", "TSMC"),
-    ("005930.KS", "삼성전자"), ("000660.KS", "SK하이닉스"),
+    ("AAPL", "애플", True), ("MSFT", "마이크로소프트", True), ("GOOGL", "구글", True),
+    ("AMZN", "아마존", True), ("META", "메타", True), ("NVDA", "엔비디아", True),
+    ("TSLA", "테슬라", True), ("MU", "마이크론", True), ("TSM", "TSMC", True),
+    ("005930.KS", "삼성전자", False), ("000660.KS", "SK하이닉스", False),
 ]
 
 
@@ -70,19 +73,32 @@ def _quad_witching_dates(year):
 
 def _earnings_events(today, days_ahead):
     """yfinance로 대표 종목의 향후 실적 발표 예정일을 조회한다.
-    개별 요청 실패(일시적 네트워크 오류 등)는 조용히 건너뛴다."""
+    해외 종목은 발표 시각을 한국시간으로 환산해 이벤트명에 같이 표기한다
+    (예: "애플 실적 발표 예정 (한국시간 7/31 05:00)") — 미국 실적 발표는 보통
+    현지 장 마감 후라 한국시간으로는 다음날 새벽이 되는 경우가 많아, 날짜만
+    보면 착각하기 쉽다. 개별 요청 실패(일시적 네트워크 오류 등)는 조용히
+    건너뛴다."""
     import yfinance as yf
     out = []
     end = today + datetime.timedelta(days=days_ahead)
-    for ticker, name in _EARNINGS_TICKERS:
+    for ticker, name, is_foreign in _EARNINGS_TICKERS:
         try:
             df = yf.Ticker(ticker).get_earnings_dates(limit=4)
             if df is None or df.empty:
                 continue
             for ts in df.index:
-                d = ts.date()
-                if today <= d <= end:
-                    out.append((d, f"{name} 실적 발표 예정"))
+                if is_foreign and ts.tzinfo is not None:
+                    kst_ts = ts.tz_convert(KST)
+                    d = kst_ts.date()
+                    if not (today <= d <= end):
+                        continue
+                    label = f"{name} 실적 발표 예정 (한국시간 {kst_ts.month}/{kst_ts.day} {kst_ts:%H:%M})"
+                else:
+                    d = ts.date()
+                    if not (today <= d <= end):
+                        continue
+                    label = f"{name} 실적 발표 예정"
+                out.append((d, label))
         except Exception:
             continue
     return out
