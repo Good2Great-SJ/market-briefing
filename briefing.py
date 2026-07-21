@@ -847,21 +847,18 @@ def render_source_list(src_list):
               <div class="srcl-actions"><a class="srcl-link" href="{it["url"]}" target="_blank" rel="noopener">원문 보기 ↗</a></div>
             </div>'''
             continue
-        preview = lines[0]
-        rest = lines[1:]
-        rest_html = "".join(f"<p>{ln}</p>" for ln in rest)
-        toggle_btn = (f'<button type="button" class="srcl-toggle" onclick="srclToggle(this,{i})">더보기 ▾</button>'
-                      if rest else "")
+        # 차지하는 공간을 줄이기 위해 요약은 기본적으로 전부 접어두고 제목만
+        # 보여준다("더보기"를 눌러야 전체 내용이 펼쳐짐).
+        all_html = "".join(f"<p>{ln}</p>" for ln in lines)
         rows += f'''<div class="srcl-row">
           <div class="srcl-head">
             <span class="srcl-badge">{it["source"]}</span>
             <span class="srcl-title">{it["title"]}</span>
             <span class="srcl-date mut">{it["date"]}</span>
           </div>
-          <p class="srcl-summary">{preview}</p>
-          <div class="srcl-summary-full" id="srcl-full-{i}" style="display:none">{rest_html}</div>
+          <div class="srcl-summary-full" id="srcl-full-{i}" style="display:none">{all_html}</div>
           <div class="srcl-actions">
-            {toggle_btn}
+            <button type="button" class="srcl-toggle" onclick="srclToggle(this,{i})">요약 보기 ▾</button>
             <a class="srcl-link" href="{it["url"]}" target="_blank" rel="noopener">원문 보기 ↗</a>
           </div>
         </div>'''
@@ -870,7 +867,7 @@ def render_source_list(src_list):
       var full = document.getElementById("srcl-full-" + idx);
       var showing = full.style.display !== "none";
       full.style.display = showing ? "none" : "";
-      btn.textContent = showing ? "더보기 ▾" : "접기 ▴";
+      btn.textContent = showing ? "요약 보기 ▾" : "접기 ▴";
     }
     </script>'''
     return f'''<section class="brief" id="sources">
@@ -1107,11 +1104,12 @@ border-radius:100px;padding:4px 10px;white-space:nowrap;}
 .srcl-summary{margin:10px 0 0;font-size:13.5px;line-height:1.65;color:var(--body);white-space:pre-line;}
 .srcl-summary-full{font-size:13.5px;line-height:1.65;color:var(--body);}
 .srcl-summary-full p{margin:8px 0 0;}
-.srcl-actions{display:flex;align-items:center;gap:14px;margin-top:10px;}
-.srcl-toggle{background:none;border:none;padding:0;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;}
-.srcl-toggle:hover{color:var(--primary);}
-.srcl-link{font-size:12px;font-weight:600;color:var(--primary);text-decoration:none;white-space:nowrap;}
-.srcl-link:hover{text-decoration:underline;}
+.srcl-actions{display:flex;align-items:center;justify-content:space-between;margin-top:10px;}
+.srcl-toggle{background:var(--strong);border:1px solid var(--hair);border-radius:100px;
+padding:6px 14px;font-size:12px;font-weight:600;color:var(--ink);cursor:pointer;}
+.srcl-toggle:hover{background:var(--hair);}
+.srcl-link{font-size:12px;font-weight:600;color:var(--muted);text-decoration:none;white-space:nowrap;}
+.srcl-link:hover{color:var(--primary);text-decoration:underline;}
 h2{font-size:29px;font-weight:400;letter-spacing:-.6px;margin:0 0 16px;color:var(--ink);}
 
 /* 총평 */
