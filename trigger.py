@@ -138,8 +138,9 @@ def _send_report_email(result, viewer_url):
     try:
         subject = f"[{result['title']}] {result['ref']}"
         args = (result["title"], result["ref"], result["narr"], result["summary"], result["mc"])
-        body = delivery.build_email_body(*args, link_url=viewer_url or "")
-        html_body = delivery.build_email_html(*args, link_url=viewer_url or "")
+        events = result.get("events")
+        body = delivery.build_email_body(*args, link_url=viewer_url or "", events=events)
+        html_body = delivery.build_email_html(*args, link_url=viewer_url or "", events=events)
         delivery.send_email(subject, body, [], html_body=html_body)
         print(f"  → 이메일 발송 완료 ({subject})")
     except Exception as e:

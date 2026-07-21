@@ -37,7 +37,7 @@ def _spaced_paragraphs(text):
     return "\n\n".join(parts)
 
 
-def build_email_body(title, ref, narr, summary, mc, link_url=""):
+def build_email_body(title, ref, narr, summary, mc, link_url="", events=None):
     """이메일 본문. 총평(소스별 분리, 전문) + 핵심 지표 + 리포트 링크.
 
     title: 제목 줄에 그대로 쓸 리포트 제목(예: "한국 증시 마감 브리핑" 또는
@@ -45,6 +45,10 @@ def build_email_body(title, ref, narr, summary, mc, link_url=""):
     유추하지 않는 이유는, 예전엔 여기서 session만 보고 "미국/한국 증시 마감"으로
     고정해 만들어서 장전 리포트처럼 제목이 달라지는 경우 메일 제목(subject)과
     본문 첫 줄이 서로 다르게 나가던 문제가 있었기 때문이다.
+
+    events: narr의 calendar 필드 대신 쓰는, events.py가 만든 확정 일정 목록
+    (FOMC·금통위·만기일·실적발표 등). 총평 원문 언급 여부와 무관하게 항상
+    일관되게 표시하기 위해 narr와 분리했다.
     """
     lines = [f"[{title}] {ref}", ""]
     bd = narr.get("butterdaddy_analysis") if narr else None
@@ -80,11 +84,11 @@ def build_email_body(title, ref, narr, summary, mc, link_url=""):
     if "KOSPI" in mc:
         lines.append(f"코스피 시총 5년내 {mc['KOSPI']['pct5']:.0f}% 수준 "
                      f"(버핏지수 {mc.get('buffett', float('nan')):.0f}%)")
-    if narr and narr.get("calendar"):
+    if events:
         lines.append("")
-        lines.append("다가오는 일정")
-        for c in narr["calendar"]:
-            lines.append(f"  - {c.get('date','')} {c.get('event','')}")
+        lines.append("체크해야 할 주요 증시 이벤트")
+        for e in events:
+            lines.append(f"  - {e.get('date','')} {e.get('event','')}")
     if link_url:
         lines.append("")
         lines.append(f"웹에서 전체 리포트 보기: {link_url}")
@@ -112,7 +116,7 @@ def _html_paragraphs(text):
     )
 
 
-def build_email_html(title, ref, narr, summary, mc, link_url=""):
+def build_email_html(title, ref, narr, summary, mc, link_url="", events=None):
     """리포트 웹페이지와 동일한 코인베이스 톤(흰 배경, #0052ff 포인트, 카드형
     섹션)으로 이메일 HTML 버전을 만든다. send_email(html_body=...)에 넘기면
     지원 클라이언트에서는 이 버전이, 미지원 클라이언트에서는 build_email_body의
@@ -181,21 +185,21 @@ def build_email_html(title, ref, narr, summary, mc, link_url=""):
           코스피 시총 5년내 <b style="color:{_CB_INK}">{mc['KOSPI']['pct5']:.0f}%</b> 수준
           (버핏지수 {mc.get('buffett', float('nan')):.0f}%)</td></tr>''')
 
-    if narr and narr.get("calendar"):
+    if events:
         rows = "".join(
             f'''<tr>
               <td style="padding:7px 0;border-bottom:1px solid {_CB_HAIR};font-size:13px;
                          color:{_CB_PRIMARY};font-weight:600;white-space:nowrap;vertical-align:top">
-                {_html_escape(c.get('date',''))}</td>
+                {_html_escape(e.get('date',''))}</td>
               <td style="padding:7px 0 7px 12px;border-bottom:1px solid {_CB_HAIR};font-size:13px;color:{_CB_INK}">
-                {_html_escape(c.get('event',''))}</td>
-            </tr>''' for c in narr["calendar"])
+                {_html_escape(e.get('event',''))}</td>
+            </tr>''' for e in events)
         sections.append(f'''<tr><td style="padding:0 0 16px">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
                  style="background:#fff;border:1px solid {_CB_HAIR};border-radius:14px">
             <tr><td style="padding:18px 22px">
               <div style="font-size:12px;font-weight:700;letter-spacing:.04em;color:{_CB_MUTED};
-                          text-transform:uppercase;margin-bottom:10px">다가오는 일정</div>
+                          text-transform:uppercase;margin-bottom:10px">체크해야 할 주요 증시 이벤트</div>
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">{rows}</table>
             </td></tr>
           </table></td></tr>''')

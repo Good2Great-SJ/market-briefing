@@ -491,13 +491,20 @@ def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None,
     elif os.path.exists(marker_path):
         os.remove(marker_path)
 
+    print("· 체크해야 할 주요 증시 이벤트 확인…")
+    try:
+        import events as events_mod
+        upcoming_events = events_mod.get_upcoming_events(datetime.datetime.now(KST).date())
+    except Exception as e:
+        print("  ! 실패:", repr(e)[:150]); upcoming_events = []
+
     theme_list = ["coinbase", "apple"] if theme == "both" else [theme]
     os.makedirs("out", exist_ok=True)
     outputs = []
     for th in theme_list:
         html = render(session, ref_str, now_kst, yf_data, kr_idx, kr_stk, money,
                       charts_us, charts_kr, summary, mc, breadth, flows, narr, th, rs, src, credit_interp,
-                      fed_odds, src_list, aitech_md, aitech_date, gap_info)
+                      fed_odds, src_list, aitech_md, aitech_date, gap_info, upcoming_events)
         base = f"out/briefing_{session}_{th}_{archive_key.replace('-','')}"
         fn = base + ".html"
         with open(fn, "w", encoding="utf-8") as f:
@@ -522,7 +529,7 @@ def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None,
             print("  ! GitHub Pages 발행 실패:", repr(e)[:150])
         outputs.append((th, fn, pdf, report_url, viewer_url))
     return dict(session=session, ref=display_ref, market_ref=ref_str, title=report_title,
-                narr=narr, summary=summary, mc=mc, outputs=outputs)
+                narr=narr, summary=summary, mc=mc, outputs=outputs, events=upcoming_events)
 
 
 _INDEX_SUPERLATIVES = ("사상 최고", "사상최고", "역대 최고", "역대최고",
@@ -599,7 +606,8 @@ def build_digest(session, yf_data, kr_idx, mc, money, summary, breadth):
 # ══════════════════════════════════════════════════════════════
 def render(session, ref, now, yf_data, kr_idx, kr_stk, money,
            charts_us, charts_kr, summary, mc, breadth, flows, narr, theme="coinbase", rs=None, src=None,
-           credit_interp=None, fed_odds=None, src_list=None, aitech_md=None, aitech_date=None, gap_info=None):
+           credit_interp=None, fed_odds=None, src_list=None, aitech_md=None, aitech_date=None, gap_info=None,
+           events=None):
     css = themes.get_css(theme, CSS)
     kr_all = {**kr_idx, **kr_stk}
     if gap_info:
@@ -626,7 +634,7 @@ def render(session, ref, now, yf_data, kr_idx, kr_stk, money,
     ratio_s = f"{ratio:.1f}%" if ratio == ratio else "–"
 
     # ── 총평 섹션 ──
-    narr_html = render_narrative(narr, summary, src)
+    narr_html = render_narrative(narr, summary, src, events)
     source_list_html = render_source_list(src_list)
 
     # ── 매크로 (장단기차 카드 포함) ──
@@ -755,11 +763,20 @@ def render(session, ref, now, yf_data, kr_idx, kr_stk, money,
 """
 
 
-def render_narrative(narr, summary, src=None):
+def render_narrative(narr, summary, src=None, events=None):
     src = src or {}
     src_badges = "".join(
         f'<a class="src-badge" href="{v["url"]}" target="_blank" rel="noopener">{k} 원문 ↗</a>'
         for k, v in src.items() if v)
+
+    # 체크해야 할 주요 증시 이벤트는 더 이상 총평(narr)에서 뽑지 않는다 — AI가 그날
+    # 원문에 언급된 것만 뽑다 보니 내용이 들쭉날쭉했다. FOMC·금통위·만기일·실적
+    # 발표일처럼 코드로 일관되게 관리하는 events.py의 확정 일정을 대신 쓴다.
+    cal = "".join(
+        f'<div class="cal-row"><span class="cal-d">{e.get("date","")}</span>'
+        f'<span class="cal-e">{e.get("event","")}</span></div>'
+        for e in (events or []))
+    cal_html = cal or '<div class="mut" style="font-size:13px">앞으로 45일 내 예정된 이벤트가 없습니다.</div>'
 
     if not narr:
         # 규칙 기반 대체 총평 (원천 콘텐츠 미발행 + 총평 생성도 실패한 경우)
@@ -772,7 +789,9 @@ def render_narrative(narr, summary, src=None):
         return (f'<section class="brief" id="narr"><div class="eyebrow"><span class="badge badge-key">Briefing</span>'
                 f'<span class="sub">규칙 기반 요약</span></div>'
                 f'<h2>오늘의 총평</h2><div class="ov-card"><p>{ov}</p>'
-                f'{f"<p class=mut style=margin-top:10px;font-size:12.5px>{note}</p>" if note else ""}</div></section>')
+                f'{f"<p class=mut style=margin-top:10px;font-size:12.5px>{note}</p>" if note else ""}</div>'
+                f'<div class="bcard cal-card"><div class="bh">체크해야 할 주요 증시 이벤트</div>'
+                f'<div class="cal">{cal_html}</div></div></section>')
 
     used = narr.get("sources_used") or []
     src_label = " · ".join(used) if used else "웹서치 보강"
@@ -781,12 +800,7 @@ def render_narrative(narr, summary, src=None):
         f'<div class="news-row"><div class="news-t">{n.get("title","")}</div>'
         f'<div class="news-i">{n.get("impact","")}</div></div>'
         for n in narr.get("news", []))
-    cal = "".join(
-        f'<div class="cal-row"><span class="cal-d">{c.get("date","")}</span>'
-        f'<span class="cal-e">{c.get("event","")}</span></div>'
-        for c in narr.get("calendar", []))
     news_html = news or '<div class="mut" style="font-size:13px">오늘 원천 콘텐츠에 특별히 언급된 뉴스가 없습니다.</div>'
-    cal_html = cal or '<div class="mut" style="font-size:13px">오늘 원천 콘텐츠에 언급된 체크 이벤트가 없습니다.</div>'
 
     # 버터대디/증시각도기 분석을 각각 온전한 별도 카드로 표시(합쳐서 압축하지 않음).
     # 구버전 스키마(overview 단일 필드)로 온 응답도 하위 호환 처리.
@@ -812,7 +826,7 @@ def render_narrative(narr, summary, src=None):
         <div class="bcard"><div class="bh">주요 체크포인트</div><ul class="cps">{cps}</ul></div>
         <div class="bcard"><div class="bh">시장 영향 뉴스</div>{news_html}</div>
       </div>
-      <div class="bcard cal-card"><div class="bh">체크해야 할 이벤트</div><div class="cal">{cal_html}</div></div>
+      <div class="bcard cal-card"><div class="bh">체크해야 할 주요 증시 이벤트</div><div class="cal">{cal_html}</div></div>
     </section>'''
 
 
