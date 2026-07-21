@@ -453,13 +453,19 @@ def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None,
     # 거래일 공백 리포트는 "미국 증시 마감"이 아니라 그날 날짜의 장전 리포트로
     # 제목·아카이브 날짜를 바꾼다(시장 데이터 자체는 ref_str/직전 개장일 그대로).
     gap_info = None
-    archive_date_str = ref_str
+    archive_key = ref_str       # 아카이브/파일명 키(충돌 방지용으로 gap일 땐 접미사 붙음)
+    display_ref = ref_str       # 이메일 등에 보여줄 깔끔한 날짜(항상 순수 YYYY-MM-DD)
     report_title = "미국 증시 마감 브리핑" if session == "us" else "한국 증시 마감 브리핑"
     if is_gap:
         weekday_kr = ["월", "화", "수", "목", "금", "토", "일"][want_date.weekday()]
-        archive_date_str = want_date.isoformat()
+        display_ref = want_date.isoformat()
+        # want_date를 그대로 아카이브 키로 쓰면, 다음날(예: 화요일) 그 날짜(월요일)의
+        # 진짜 마감 리포트가 나올 때 같은 (session, date) 키를 다시 써서 이 장전
+        # 리포트를 조용히 덮어써버리는 문제가 실제로 있었다(2026-07-21) — "-premarket"
+        # 접미사로 키 공간을 아예 분리해 어느 쪽도 서로 덮어쓰지 않게 한다.
+        archive_key = f"{display_ref}-premarket"
         report_title = f"{want_date.month}월 {want_date.day}일({weekday_kr}) 한국증시 장전 리포트"
-        gap_info = dict(display_date=archive_date_str, weekday_kr=weekday_kr, market_ref=ref_str, title=report_title)
+        gap_info = dict(display_date=display_ref, weekday_kr=weekday_kr, market_ref=ref_str, title=report_title)
 
     # 매칭된 원천(버터대디/증시각도기) 중 자막이 아직 안 붙어 설명란으로만
     # 채워진(status=transcript_pending) 게 있거나, AI-Tech 뉴스 파일이 아직
@@ -469,12 +475,12 @@ def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None,
                for v in src_raw.values() if v and v.get("status") == "transcript_pending"}
     aitech_missing = aitech_md is None
     marker_dir = os.path.join("out", ".triggers")
-    marker_path = os.path.join(marker_dir, f"{session}_{archive_date_str}.pending.json")
+    marker_path = os.path.join(marker_dir, f"{session}_{archive_key}.pending.json")
     if pending or aitech_missing:
         os.makedirs(marker_dir, exist_ok=True)
         with open(marker_path, "w", encoding="utf-8") as f:
             json.dump(dict(session=session, theme=theme, source_date=want_date.isoformat(),
-                           archive_date=archive_date_str, pending=pending,
+                           archive_date=archive_key, pending=pending,
                            aitech_missing=aitech_missing,
                            first_seen=datetime.datetime.now(KST).isoformat()), f, ensure_ascii=False)
         reasons = []
@@ -491,7 +497,7 @@ def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None,
         html = render(session, ref_str, now_kst, yf_data, kr_idx, kr_stk, money,
                       charts_us, charts_kr, summary, mc, breadth, flows, narr, th, rs, src, credit_interp,
                       fed_odds, src_list, aitech_md, aitech_date, gap_info)
-        base = f"out/briefing_{session}_{th}_{archive_date_str.replace('-','')}"
+        base = f"out/briefing_{session}_{th}_{archive_key.replace('-','')}"
         fn = base + ".html"
         with open(fn, "w", encoding="utf-8") as f:
             f.write(html)
@@ -507,13 +513,14 @@ def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None,
         report_url = viewer_url = None
         try:
             import pages
-            report_url, viewer_url = pages.publish_report(session, th, archive_date_str, fn,
-                                                            title=report_title if is_gap else None)
+            report_url, viewer_url = pages.publish_report(session, th, archive_key, fn,
+                                                            title=report_title if is_gap else None,
+                                                            display_date=display_ref if is_gap else None)
             print("· Pages:", viewer_url)
         except Exception as e:
             print("  ! GitHub Pages 발행 실패:", repr(e)[:150])
         outputs.append((th, fn, pdf, report_url, viewer_url))
-    return dict(session=session, ref=archive_date_str, market_ref=ref_str, title=report_title,
+    return dict(session=session, ref=display_ref, market_ref=ref_str, title=report_title,
                 narr=narr, summary=summary, mc=mc, outputs=outputs)
 
 

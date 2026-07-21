@@ -127,14 +127,16 @@ def check_and_run(now_sgt=None, dry_run=False):
     return fired
 
 
-def _send_report_email(result, viewer_url, note=None):
-    """리포트가 새로 생성/재발행될 때마다 이메일도 함께 보낸다.
+def _send_report_email(result, viewer_url):
+    """리포트가 처음 새로 발행될 때 이메일을 보낸다.
 
-    note가 있으면(자막 지연 재발행 등) 제목에 덧붙여 일반 발행과 구분한다.
+    자막/AI-Tech 지연 반영 등으로 조용히 재발행되는 경우는 여기서 호출하지
+    않는다(사이트만 갱신, 이미 최초 발행 때 받은 메일을 또 보내면 스팸처럼
+    느껴진다는 피드백).
     """
     import delivery
     try:
-        subject = f"[{result['title']}] {result['ref']}" + (f" ({note})" if note else "")
+        subject = f"[{result['title']}] {result['ref']}"
         args = (result["title"], result["ref"], result["narr"], result["summary"], result["mc"])
         body = delivery.build_email_body(*args, link_url=viewer_url or "")
         html_body = delivery.build_email_html(*args, link_url=viewer_url or "")
@@ -205,8 +207,9 @@ def recheck_pending_updates(now_sgt=None):
                 print(f"[재발행] 생략 — {result['skipped']}")
                 os.remove(path)
                 continue
-            _, _, _, _, viewer_url = result["outputs"][0]
-            _send_report_email(result, viewer_url, note=" · ".join(reasons))
+            # 자막/AI-Tech가 뒤늦게 붙어 조용히 갱신하는 경우다 — 최초 발행 때 이미
+            # 이메일을 받은 리포트라 매번 또 보내면 스팸처럼 느껴진다는 피드백으로,
+            # 사이트만 갱신하고 이메일은 다시 보내지 않는다.
             updated.append((marker["session"], marker["archive_date"]))
             # briefing.build()가 이 재빌드 결과를 바탕으로 마커 파일 자체를 이미
             # 새로 쓰거나(다른 원천이 여전히 대기 중) 지웠으므로(전부 해결) 여기서

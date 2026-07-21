@@ -4,15 +4,23 @@
     "date": "2026-07-20",
     "theme": "coinbase",
     "path": "reports/us_coinbase_20260720.html",
-    "generated_at": "2026-07-20T21:48:02+09:00",
-    "title": "7월 20일(월) 한국증시 장전 리포트"
+    "generated_at": "2026-07-21T08:58:54+09:00"
   },
   {
     "session": "kr",
     "date": "2026-07-20",
     "theme": "coinbase",
     "path": "reports/kr_coinbase_20260720.html",
-    "generated_at": "2026-07-20T23:01:15+09:00"
+    "generated_at": "2026-07-21T09:01:05+09:00"
+  },
+  {
+    "session": "us",
+    "date": "2026-07-20-premarket",
+    "theme": "coinbase",
+    "path": "reports/us_coinbase_20260720premarket.html",
+    "generated_at": "2026-07-20T21:48:02+09:00",
+    "title": "7월 20일(월) 한국증시 장전 리포트",
+    "display_date": "2026-07-20"
   },
   {
     "session": "us",

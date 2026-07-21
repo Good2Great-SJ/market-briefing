@@ -66,7 +66,7 @@ let manifest = [];
 
 function label(r){
   const sess = r.title || (r.session === "us" ? "미국 증시 마감" : "한국 증시 마감");
-  return `${r.date} · ${sess}`;
+  return `${r.display_date || r.date} · ${sess}`;
 }
 
 function showReport(r){
