@@ -251,6 +251,15 @@ def update_post_images(post_id, title, hero_path, body_image_url, headless=True)
 
         page.click("#publish-layer-btn")
         page.wait_for_selector("#publish-btn", state="visible", timeout=10000)
+        # 수정 글은 기존 대표이미지가 있으면 file input 대신 삭제 버튼만 보인다.
+        # 기존 이미지를 먼저 제거해야 새 업로드 input이 생성된다.
+        file_input = page.locator(".box_thumb input[type=file]")
+        if file_input.count() == 0:
+            delete_button = page.locator(".box_thumb .ico_delete")
+            if delete_button.count() != 1:
+                raise RuntimeError("기존 대표이미지 제거 버튼을 찾지 못했습니다.")
+            delete_button.click()
+            page.wait_for_selector(".box_thumb input[type=file]", state="attached", timeout=10000)
         page.locator(".box_thumb input[type=file]").set_input_files(hero_path)
         page.wait_for_selector(".box_thumb .thumb_g", state="visible", timeout=15000)
         bg = page.eval_on_selector(".box_thumb .thumb_g", "el => el.style.backgroundImage")
@@ -279,7 +288,8 @@ def update_post_images(post_id, title, hero_path, body_image_url, headless=True)
             "(value) => { const ed=tinymce.get('editor-tistory'); ed.setContent(value); ed.save(); }",
             current)
         synced = page.eval_on_selector("#editor-tistory", "el => el.value")
-        if hero_url not in synced or body_image_url not in synced:
+        synced_unescaped = html.unescape(synced)
+        if hero_url not in synced_unescaped or body_image_url not in synced_unescaped:
             raise RuntimeError("새 대표·본문 이미지가 저장 본문에 동기화되지 않았습니다.")
         page.click("#publish-btn")
         try:
