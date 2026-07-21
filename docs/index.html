@@ -133,11 +133,18 @@ async function loadManifest(bust){
     // 마지막 이벤트이므로 미국 리포트가 항상 위(최신)로 온다. generated_at을
     // 기준으로 삼으면 자막/AI-Tech 지연 반영으로 조용히 재발행된 kr 리포트의
     // 갱신 시각이 우연히 더 늦어져 순서가 뒤집히는 문제가 있었다 — 같은 날짜
-    // 안에서는 session으로 고정 정렬하고, 날짜 자체는 최신순으로 정렬한다.
-    // (거래일 공백 리포트는 "-premarket" 접미사로 date 자체가 분리돼 있어
-    // 이 규칙과 충돌하지 않는다.)
+    // 안에서는 session으로 고정 정렬한다.
+    // 거래일 공백(장전) 리포트는 date에 "-premarket" 접미사가 붙어 앞 10자리
+    // (YYYY-MM-DD)는 같지만 문자열 자체는 더 길다 — 그대로 비교하면 접미사
+    // 때문에 "더 큰(최신)" 문자열로 오인돼 정상 리포트보다 위로 떠버리므로,
+    // 날짜 그룹은 앞 10자리로만 비교하고 장전 리포트는 그 그룹의 맨 끝(가장
+    // 먼저 발행된 것)으로 고정한다.
+    const baseDate = d => d.slice(0, 10);
     manifest.sort((a,b) => {
-      if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+      const ad = baseDate(a.date), bd = baseDate(b.date);
+      if (ad !== bd) return ad < bd ? 1 : -1;
+      const aGap = a.date.length > 10, bGap = b.date.length > 10;
+      if (aGap !== bGap) return aGap ? 1 : -1;
       if (a.session !== b.session) return a.session === "us" ? -1 : 1;
       const at = a.generated_at || "", bt = b.generated_at || "";
       return at < bt ? 1 : at > bt ? -1 : 0;
