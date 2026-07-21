@@ -661,8 +661,8 @@ def render(session, ref, now, yf_data, kr_idx, kr_stk, money,
     ci = credit_interp
     ci_ratio_pct = f"{ci['ratio_pct']:.0f}%" if ci else "–"
     money_block = f'''<div class="money">
-      <div class="mcard"><div class="ml">고객예탁금</div><div class="mv num">{yetak}</div><div class="mc num">{yetak_c}</div></div>
-      <div class="mcard"><div class="ml">신용융자잔고</div><div class="mv num">{sinyong}</div><div class="mc num">{sinyong_c}</div></div>
+      <div class="mcard"><div class="ml">고객예탁금 <span class="mut" style="font-weight:400">(기준 {m_date})</span></div><div class="mv num">{yetak}</div><div class="mc num">{yetak_c}</div></div>
+      <div class="mcard"><div class="ml">신용융자잔고 <span class="mut" style="font-weight:400">(기준 {m_date})</span></div><div class="mv num">{sinyong}</div><div class="mc num">{sinyong_c}</div></div>
       <div class="mcard"><div class="ml">신용 / 예탁금 비율</div><div class="mv num">{ratio_s}</div>
         <div class="mc mut">기준일 {m_date} · 1년내 상위 {ci_ratio_pct if ci else "–"}</div></div>
     </div>'''
