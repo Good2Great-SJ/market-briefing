@@ -60,7 +60,41 @@ BLOG = "https://doleman.tistory.com"
 NEWPOST_URL = f"{BLOG}/manage/newpost/"
 
 
-def publish_post(title, tags, body_html, category_id, thumbnail_path=None, publish=True, headless=True):
+def _insert_body_image_html(body_html, body_image_url, title):
+    safe_alt = html.escape(f"{title} 핵심 흐름 설명 이미지", quote=True)
+    figure = (f'<figure class="imageblock alignCenter"><img '
+              f'src="{html.escape(body_image_url, quote=True)}" alt="{safe_alt}">'
+              f'<figcaption>{safe_alt}</figcaption></figure>')
+    enriched, count = re.subn(r"(</h[23]>)", r"\1" + figure,
+                              body_html, count=1, flags=re.IGNORECASE)
+    if count != 1:
+        raise RuntimeError("본문 이미지 배치 지점을 찾지 못했습니다.")
+    return enriched
+
+
+def _upload_representative(page, image_path):
+    """대표이미지 슬롯을 임시 CDN 업로더로 사용하고 원본 공개 URL을 반환한다."""
+    if not os.path.isfile(image_path):
+        raise RuntimeError(f"이미지 파일을 찾을 수 없습니다: {image_path}")
+    file_input = page.locator(".box_thumb input[type=file]")
+    if file_input.count() == 0:
+        delete_button = page.locator(".box_thumb .ico_delete")
+        if delete_button.count() != 1:
+            raise RuntimeError("기존 대표이미지 제거 버튼을 찾지 못했습니다.")
+        delete_button.click()
+        page.wait_for_selector(".box_thumb input[type=file]", state="attached", timeout=10000)
+    page.locator(".box_thumb input[type=file]").set_input_files(image_path)
+    page.wait_for_selector(".box_thumb .thumb_g", state="visible", timeout=15000)
+    bg = page.eval_on_selector(".box_thumb .thumb_g", "el => el.style.backgroundImage")
+    match = re.search(r'url\("?(.*?)"?\)', bg)
+    result = _full_res_url(match.group(1)) if match else None
+    if not result:
+        raise RuntimeError("Tistory CDN 이미지 URL을 확인하지 못했습니다.")
+    return result
+
+
+def publish_post(title, tags, body_html, category_id, thumbnail_path=None,
+                 body_image_path=None, publish=True, headless=True):
     """
     반환: {"url": 발행된(또는 발행 직전 확인된) 글의 URL, "thumbnail_url": 업로드된
     대표이미지의 공개 URL(t1.daumcdn.net 등, 없으면 None)}
@@ -154,22 +188,24 @@ def publish_post(title, tags, body_html, category_id, thumbnail_path=None, publi
         # 표시된다. 그리고 이 "대표이미지"는 목록/공유용일 뿐 본문에는 자동으로 안 보이므로,
         # 실제로 글 안에 이미지가 보이게 하려면 URL을 뽑아서 본문 맨 앞에 <img>로 직접 넣어야 한다.
         thumbnail_url = None
+        body_image_url = None
         if thumbnail_path:
             if not os.path.isfile(thumbnail_path):
                 raise RuntimeError(f"썸네일 파일을 찾을 수 없습니다: {thumbnail_path}")
-            page.locator(".box_thumb input[type=file]").set_input_files(thumbnail_path)
-            try:
-                page.wait_for_selector(".box_thumb .thumb_g", state="visible", timeout=15000)
-                bg = page.eval_on_selector(".box_thumb .thumb_g", "el => el.style.backgroundImage")
-                m = re.search(r'url\("?(.*?)"?\)', bg)
-                thumbnail_url = _full_res_url(m.group(1)) if m else None
-            except PWTimeout:
-                thumbnail_url = None
+            # 본문 이미지도 외부 raw URL을 직접 쓰지 않고 Tistory CDN에 먼저 올린다.
+            # 대표 슬롯에 본문 이미지를 임시 업로드해 URL을 얻고, 마지막에 대표를 올린다.
+            if body_image_path:
+                body_image_url = _upload_representative(page, body_image_path)
+                page.locator(".box_thumb .ico_delete").click()
+                page.wait_for_selector(".box_thumb input[type=file]", state="attached", timeout=10000)
+            thumbnail_url = _upload_representative(page, thumbnail_path)
 
             if thumbnail_url:
                 safe_alt = html.escape(title, quote=True)
+                content_body = (_insert_body_image_html(body_html, body_image_url, title)
+                                if body_image_url else body_html)
                 enriched_body = structured_data.prepend_json_ld(
-                    body_html, title, image_url=thumbnail_url)
+                    content_body, title, image_url=thumbnail_url)
                 current_body = (
                     f'<img src="{thumbnail_url}" alt="{safe_alt}"><br>{enriched_body}')
                 page.evaluate(
@@ -183,7 +219,8 @@ def publish_post(title, tags, body_html, category_id, thumbnail_path=None, publi
         if not publish:
             url = page.url
             context.close()
-            return {"url": url, "thumbnail_url": thumbnail_url}
+            return {"url": url, "thumbnail_url": thumbnail_url,
+                    "body_image_url": body_image_url}
 
         # 발행 직전 최종 재확인 — 태그 입력/썸네일 업로드 등 중간 동작으로 에디터가
         # 초기화되는 경우를 대비해 저장용 textarea 내용을 다시 한번 검증한다.
@@ -219,15 +256,16 @@ def publish_post(title, tags, body_html, category_id, thumbnail_path=None, publi
 
         final_url = public_url or page.url
         context.close()
-        return {"url": final_url, "thumbnail_url": thumbnail_url}
+        return {"url": final_url, "thumbnail_url": thumbnail_url,
+                "body_image_url": body_image_url}
 
 
-def update_post_images(post_id, title, hero_path, body_image_url, headless=True):
+def update_post_images(post_id, title, hero_path, body_image_path, headless=True):
     """기존 글의 레거시 첫 이미지를 새 대표이미지로 교체하고 본문 이미지를 추가한다."""
     if not os.path.isfile(hero_path):
         raise RuntimeError(f"대표이미지 파일을 찾을 수 없습니다: {hero_path}")
-    if not body_image_url.startswith("https://"):
-        raise RuntimeError("본문 이미지는 공개 HTTPS URL이어야 합니다.")
+    if not os.path.isfile(body_image_path):
+        raise RuntimeError(f"본문 이미지 파일을 찾을 수 없습니다: {body_image_path}")
     has_storage_state = os.path.isfile(STORAGE_STATE_PATH)
     if not has_storage_state:
         raise RuntimeError("Tistory storage_state.json 로그인 세션이 필요합니다.")
@@ -253,20 +291,12 @@ def update_post_images(post_id, title, hero_path, body_image_url, headless=True)
         page.wait_for_selector("#publish-btn", state="visible", timeout=10000)
         # 수정 글은 기존 대표이미지가 있으면 file input 대신 삭제 버튼만 보인다.
         # 기존 이미지를 먼저 제거해야 새 업로드 input이 생성된다.
-        file_input = page.locator(".box_thumb input[type=file]")
-        if file_input.count() == 0:
-            delete_button = page.locator(".box_thumb .ico_delete")
-            if delete_button.count() != 1:
-                raise RuntimeError("기존 대표이미지 제거 버튼을 찾지 못했습니다.")
-            delete_button.click()
-            page.wait_for_selector(".box_thumb input[type=file]", state="attached", timeout=10000)
-        page.locator(".box_thumb input[type=file]").set_input_files(hero_path)
-        page.wait_for_selector(".box_thumb .thumb_g", state="visible", timeout=15000)
-        bg = page.eval_on_selector(".box_thumb .thumb_g", "el => el.style.backgroundImage")
-        match = re.search(r'url\("?(.*?)"?\)', bg)
-        hero_url = _full_res_url(match.group(1)) if match else None
-        if not hero_url:
-            raise RuntimeError("새 대표이미지 업로드 URL을 확인하지 못했습니다.")
+        # 본문 이미지를 먼저 임시 대표로 업로드해 Tistory CDN URL을 얻는다.
+        body_image_url = _upload_representative(page, body_image_path)
+        page.locator(".box_thumb .ico_delete").click()
+        page.wait_for_selector(".box_thumb input[type=file]", state="attached", timeout=10000)
+        # 마지막 업로드가 실제 대표이미지가 된다.
+        hero_url = _upload_representative(page, hero_path)
 
         safe_alt = html.escape(title, quote=True)
         hero_tag = f'<img src="{html.escape(hero_url, quote=True)}" alt="{safe_alt}">'
@@ -275,6 +305,10 @@ def update_post_images(post_id, title, hero_path, body_image_url, headless=True)
                              flags=re.IGNORECASE)
         else:
             current = hero_tag + "<br>" + current
+        # 깨진 외부 raw 본문 이미지는 제거한 뒤 CDN 이미지로 다시 삽입한다.
+        current = re.sub(
+            r'<figure[^>]*>\s*<img[^>]+raw\.githubusercontent\.com[^>]*>.*?</figure>',
+            '', current, flags=re.IGNORECASE | re.DOTALL)
         if body_image_url not in current:
             body_alt = html.escape(f"{title} 핵심 흐름 설명 이미지", quote=True)
             body_tag = (f'<figure class="imageblock alignCenter"><img '

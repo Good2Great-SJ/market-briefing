@@ -117,7 +117,7 @@ def _insert_body_image(body_html, image_url, title):
 
 def run(session, dry_run, make_pdf, use_thumbnail, use_video, use_threads,
         force=False, threads_image_url=None, hero_image_path=None,
-        body_image_url=None):
+        body_image_path=None):
     if session in ("us", "kr", "ai") and not os.path.isdir(MB_DIR):
         raise RuntimeError(f"market-briefing 폴더를 찾을 수 없습니다: {MB_DIR}")
 
@@ -173,19 +173,18 @@ def run(session, dry_run, make_pdf, use_thumbnail, use_video, use_threads,
         missing.append("신규 대표이미지 로컬 경로")
     elif not os.path.isfile(hero_image_path):
         raise RuntimeError(f"대표이미지 파일을 찾을 수 없습니다: {hero_image_path}")
-    if not body_image_url:
-        missing.append("별도 본문 이미지 공개 URL")
+    if not body_image_path:
+        missing.append("별도 본문 이미지 로컬 경로")
+    elif not os.path.isfile(body_image_path):
+        raise RuntimeError(f"본문 이미지 파일을 찾을 수 없습니다: {body_image_path}")
     if use_threads and not threads_image_url:
         missing.append("별도 Threads 4:5 이미지 공개 URL")
     if missing and not dry_run:
         raise RuntimeError("이미지 사전 준비 미완료: " + ", ".join(missing))
     thumbnail_path = hero_image_path
-    if body_image_url:
-        post["body_html"] = _insert_body_image(
-            post["body_html"], body_image_url, post["title"])
     print("[3/4] 신규 이미지 사전검증 완료")
     print("  대표이미지:", thumbnail_path)
-    print("  본문이미지:", body_image_url)
+    print("  본문이미지:", body_image_path)
     print("  Threads 이미지:", threads_image_url)
 
     if dry_run:
@@ -204,7 +203,7 @@ def run(session, dry_run, make_pdf, use_thumbnail, use_video, use_threads,
     import publisher
     pub = publisher.publish_post(
         post["title"], post["tags"], post["body_html"], post["category_id"],
-        thumbnail_path=thumbnail_path)
+        thumbnail_path=thumbnail_path, body_image_path=body_image_path)
     print("발행 완료:", pub["url"])
     if thumbnail_path and not pub.get("thumbnail_url"):
         print("  ! 대표이미지 업로드는 시도했으나 공개 URL을 확인하지 못했습니다.")
@@ -266,8 +265,8 @@ if __name__ == "__main__":
                     help="블로그 대표이미지와 별도로 제작·공개 호스팅한 Threads 전용 4:5 이미지 URL")
     ap.add_argument("--hero-image-path",
                     help="imagegen으로 새로 제작한 16:9 대표이미지 로컬 경로(필수)")
-    ap.add_argument("--body-image-url",
-                    help="대표이미지와 별도로 제작한 본문 중간 이미지 공개 URL(필수)")
+    ap.add_argument("--body-image-path",
+                    help="대표이미지와 별도로 제작한 본문 중간 이미지 로컬 경로(필수, Tistory CDN 업로드)")
     ap.add_argument("--video", action="store_true", help="발행 후 홍보영상 생성(Higgsfield, 실험적)")
     ap.add_argument("--force", action="store_true",
                     help="이미 완료된 슬롯도 신규·비중복 글 테스트를 위해 1회 강제 실행")
@@ -275,4 +274,4 @@ if __name__ == "__main__":
     args = ap.parse_args()
     run(args.session, args.dry_run, args.pdf, args.thumbnail, args.video,
         args.threads, force=args.force, threads_image_url=args.threads_image_url,
-        hero_image_path=args.hero_image_path, body_image_url=args.body_image_url)
+        hero_image_path=args.hero_image_path, body_image_path=args.body_image_path)
