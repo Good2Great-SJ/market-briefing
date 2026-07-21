@@ -440,6 +440,7 @@ def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None,
     print("· 총평 생성…")
     digest = build_digest(session, yf_data, kr_idx, mc, money, summary, breadth)
     narr = narrative.generate(session, digest, now_kst, sources=src)
+    narr = _reject_unverified_index_superlatives(narr)
     print("  →", "성공" if narr else "생략(규칙 기반 대체)")
 
     # 차트
@@ -522,6 +523,39 @@ def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None,
         outputs.append((th, fn, pdf, report_url, viewer_url))
     return dict(session=session, ref=display_ref, market_ref=ref_str, title=report_title,
                 narr=narr, summary=summary, mc=mc, outputs=outputs)
+
+
+_INDEX_SUPERLATIVES = ("사상 최고", "사상최고", "역대 최고", "역대최고",
+                       "사상 최저", "사상최저", "역대 최저", "역대최저", "신기록")
+_INDEX_KEYWORDS = ("코스피", "코스닥", "KOSPI", "KOSDAQ", "지수")
+
+
+def _reject_unverified_index_superlatives(narr):
+    """총평 프롬프트 지침만으로는 AI의 사실 왜곡을 100% 막을 수 없다(실제로
+    "코스피 시총 5년내 97%"를 "지수가 사상 최고치"로 잘못 해석해 지어낸 사고가
+    있었음) — 발행 전 마지막 방어선으로, 지수 자체에 대한 "사상 최고/최저" 같은
+    단정적 주장이 섞여 있으면 자동으로 검증할 근거가 없으므로 총평 전체를
+    폐기하고 규칙 기반 대체 문구로 넘어가게 한다. 개별 종목·기업 실적에 대한
+    같은 표현(예: "TSMC 역대급 실적")은 검증이 사실상 불가능해 오탐이 잦으므로
+    지수 관련 문맥에서만 걸러낸다.
+    """
+    if not narr:
+        return narr
+    fields = [narr.get("overview") or "", narr.get("butterdaddy_analysis") or "",
+              narr.get("jeungsi_analysis") or ""]
+    fields += list(narr.get("checkpoints", []))
+    fields += [n.get("title", "") + " " + n.get("impact", "") for n in narr.get("news", [])]
+    combined = " ".join(fields)
+    for phrase in _INDEX_SUPERLATIVES:
+        idx = combined.find(phrase)
+        while idx != -1:
+            window = combined[max(0, idx - 30): idx + 30]
+            if any(k in window for k in _INDEX_KEYWORDS):
+                print(f"  ! 총평에서 검증 안 된 지수 관련 단정 표현('{phrase}') 감지 "
+                      "— 총평 전체를 폐기하고 규칙 기반으로 대체")
+                return None
+            idx = combined.find(phrase, idx + 1)
+    return narr
 
 
 def build_digest(session, yf_data, kr_idx, mc, money, summary, breadth):
