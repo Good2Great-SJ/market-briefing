@@ -74,6 +74,80 @@ def _mark_email_sent(session, date_str):
         json.dump({"at": datetime.datetime.now(SGT).isoformat()}, f, ensure_ascii=False)
 
 
+def _email_payload_path(session, date_str):
+    return os.path.join(MARKER_DIR, f"{session}_{date_str}.email.json")
+
+
+# 발송 실패 시 워크플로우 잡을 눈에 띄게 실패 처리하기 위한 플래그 파일.
+# (기존엔 발송 실패도 로그 한 줄로 삼켜져 잡이 초록색 성공으로 표시됐고,
+#  아무도 눈치채지 못한 채 이메일이 누락됐다 — 2026-07-21~22 실사고 3건.)
+EMAIL_FAILED_FLAG = os.path.join(MARKER_DIR, "EMAIL_FAILED")
+
+# 발송 재시도 유효 시간. 이보다 오래된 미발송 페이로드는 내용이 낡아
+# 보내는 의미가 없으므로 폐기한다(다음 세션 리포트가 곧 나올 시간).
+EMAIL_RETRY_HOURS = 12
+
+
+def _save_email_payload(session, date_str, subject, body, html_body):
+    """발송할 이메일 내용을 디스크에 보관한다.
+
+    발송이 실패해도 다음 15분 주기 실행이 이 파일을 읽어 재시도할 수 있도록
+    — 리포트 재빌드 없이 — 발송에 필요한 전부를 저장해 둔다. 이 파일은
+    워크플로우가 out/과 함께 커밋하므로 실행(러너)이 바뀌어도 유지된다."""
+    os.makedirs(MARKER_DIR, exist_ok=True)
+    with open(_email_payload_path(session, date_str), "w", encoding="utf-8") as f:
+        json.dump({"subject": subject, "body": body, "html_body": html_body,
+                   "created_at": datetime.datetime.now(SGT).isoformat()}, f, ensure_ascii=False)
+
+
+def retry_unsent_emails(now_sgt=None):
+    """발행은 됐는데 이메일 발송이 안 된 리포트를 찾아 재발송한다.
+
+    저장된 페이로드(*.email.json) 중 .email_sent 마커가 없는 것이 대상.
+    성공하면 마커를 남기고 페이로드를 지운다. EMAIL_RETRY_HOURS를 넘긴
+    페이로드는 낡은 내용이므로 재발송 없이 폐기한다."""
+    now_sgt = now_sgt or datetime.datetime.now(SGT)
+    if not os.path.isdir(MARKER_DIR):
+        return
+    import delivery
+    any_failed = False
+    for fn in sorted(os.listdir(MARKER_DIR)):
+        if not fn.endswith(".email.json"):
+            continue
+        key = fn[:-len(".email.json")]          # "{session}_{date_str}"
+        session, _, date_str = key.partition("_")
+        path = os.path.join(MARKER_DIR, fn)
+        if _email_already_sent(session, date_str):
+            os.remove(path)                      # 이미 발송됨 — 페이로드 정리만
+            continue
+        try:
+            with open(path, encoding="utf-8") as f:
+                payload = json.load(f)
+        except Exception:
+            os.remove(path)
+            continue
+        age_h = (now_sgt - datetime.datetime.fromisoformat(payload["created_at"])).total_seconds() / 3600
+        if age_h > EMAIL_RETRY_HOURS:
+            print(f"[이메일 재시도] {key} — {age_h:.1f}시간 경과, 내용이 낡아 폐기")
+            os.remove(path)
+            continue
+        print(f"[이메일 재시도] {key} — 이전 실행에서 발송 실패분 재발송 시도")
+        try:
+            delivery.send_email(payload["subject"], payload["body"], [],
+                                html_body=payload.get("html_body"))
+            print(f"  → 재발송 성공 ({payload['subject']})")
+            _mark_email_sent(session, date_str)
+            os.remove(path)
+        except Exception as e:
+            print("  ! 재발송도 실패:", repr(e)[:200])
+            any_failed = True
+    if any_failed:
+        with open(EMAIL_FAILED_FLAG, "w", encoding="utf-8") as f:
+            f.write(datetime.datetime.now(SGT).isoformat())
+    elif os.path.exists(EMAIL_FAILED_FLAG):
+        os.remove(EMAIL_FAILED_FLAG)
+
+
 def check_and_run(now_sgt=None, dry_run=False):
     now_sgt = now_sgt or datetime.datetime.now(SGT)
     date_str = now_sgt.date().isoformat()
@@ -144,19 +218,26 @@ def check_and_run(now_sgt=None, dry_run=False):
                 continue
             _, fn, pdf, report_url, viewer_url = result["outputs"][0]
             fired.append((session, reason, fn))
-            if _send_report_email(result, viewer_url):
+            if _send_report_email(result, viewer_url, session=session, date_str=date_str):
                 _mark_email_sent(session, date_str)
+                payload = _email_payload_path(session, date_str)
+                if os.path.exists(payload):
+                    os.remove(payload)
         else:
             fired.append((session, reason, None))
     return fired
 
 
-def _send_report_email(result, viewer_url):
+def _send_report_email(result, viewer_url, session=None, date_str=None):
     """리포트가 처음 새로 발행될 때 이메일을 보낸다.
 
-    자막/AI-Tech 지연 반영 등으로 조용히 재발행되는 경우는 여기서 호출하지
-    않는다(사이트만 갱신, 이미 최초 발행 때 받은 메일을 또 보내면 스팸처럼
+    자막 지연 반영 등으로 조용히 재발행되는 경우는 여기서 호출하지 않는다
+    (사이트만 갱신, 이미 최초 발행 때 받은 메일을 또 보내면 스팸처럼
     느껴진다는 피드백).
+
+    session/date_str가 주어지면 발송 시도 **전에** 이메일 내용을 디스크에
+    저장한다 — 발송이 실패해도 다음 15분 주기 실행의 retry_unsent_emails()가
+    리포트 재빌드 없이 재발송할 수 있게 하기 위함(자가치유).
     """
     import delivery
     try:
@@ -165,6 +246,8 @@ def _send_report_email(result, viewer_url):
         events = result.get("events")
         body = delivery.build_email_body(*args, link_url=viewer_url or "", events=events)
         html_body = delivery.build_email_html(*args, link_url=viewer_url or "", events=events)
+        if session and date_str:
+            _save_email_payload(session, date_str, subject, body, html_body)
         delivery.send_email(subject, body, [], html_body=html_body)
         print(f"  → 이메일 발송 완료 ({subject})")
         return True
@@ -192,7 +275,7 @@ def recheck_pending_updates(now_sgt=None):
     if not os.path.isdir(MARKER_DIR):
         return updated
 
-    import sources, briefing, ai_tech
+    import sources, briefing
     for fn in sorted(os.listdir(MARKER_DIR)):
         if not fn.endswith(".pending.json"):
             continue
@@ -216,20 +299,20 @@ def recheck_pending_updates(now_sgt=None):
             else:
                 still_pending[pid] = baseline_len
 
-        aitech_still_missing = marker.get("aitech_missing", False)
-        if aitech_still_missing:
-            src_date = datetime.date.fromisoformat(marker["source_date"])
-            aitech_md, _ = ai_tech.get_ai_tech_markdown(marker["session"], src_date)
-            if aitech_md:
-                resolved = True
-                aitech_still_missing = False
-                reasons.append("AI-Tech 반영")
-
         if resolved:
             print(f"[재발행] {marker['session']} {marker['archive_date']} — {' · '.join(reasons)}, 리포트 갱신")
             src_date = datetime.date.fromisoformat(marker["source_date"])
             result = briefing.build(session=marker["session"], theme=marker.get("theme", "coinbase"),
-                                     make_pdf=False, source_date=src_date)
+                                     make_pdf=False, source_date=src_date,
+                                     require_narrative=True)
+            if result.get("skipped") == "narrative_unavailable":
+                # 총평 생성이 일시적으로 실패 — 기존 발행본을 유지했고, 마커도
+                # 남겨둬 다음 15분 주기 실행에서 다시 시도한다(단, 재시도 시한
+                # 이 지나면 아래 else 분기 로직과 동일하게 포기·정리).
+                elapsed_h = (now_sgt - datetime.datetime.fromisoformat(marker["first_seen"])).total_seconds() / 3600
+                if elapsed_h >= PENDING_RETRY_HOURS:
+                    os.remove(path)
+                continue
             if result.get("skipped"):
                 print(f"[재발행] 생략 — {result['skipped']}")
                 os.remove(path)
@@ -244,9 +327,8 @@ def recheck_pending_updates(now_sgt=None):
             continue
 
         elapsed_h = (now_sgt - datetime.datetime.fromisoformat(marker["first_seen"])).total_seconds() / 3600
-        if (still_pending or aitech_still_missing) and elapsed_h < PENDING_RETRY_HOURS:
+        if still_pending and elapsed_h < PENDING_RETRY_HOURS:
             marker["pending"] = still_pending
-            marker["aitech_missing"] = aitech_still_missing
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(marker, f, ensure_ascii=False)
         else:
@@ -266,3 +348,5 @@ if __name__ == "__main__":
         updated = recheck_pending_updates()
         for session, date_str in updated:
             print(f"재발행 완료: {session} ({date_str})")
+        # 이전 실행에서 발송에 실패한 이메일이 있으면 리포트 재빌드 없이 재발송
+        retry_unsent_emails()

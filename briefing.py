@@ -28,7 +28,6 @@ import analytics
 import narrative
 import themes
 import sources as srcmod
-import ai_tech
 
 for _f in ("Malgun Gothic", "Apple SD Gothic Neo", "NanumGothic", "DejaVu Sans"):
     try:
@@ -272,7 +271,7 @@ _NAV_LABELS = {
     "narr": "총평", "sources": "소스", "macro": "매크로", "fed": "Fed",
     "us_idx": "미국지수", "global": "글로벌", "semi": "반도체", "sectors": "섹터",
     "rs": "RS랭킹", "m7": "M7·AI", "chart_us": "차트(US)",
-    "kr": "한국시장", "chart_kr": "차트(KR)", "aitech": "AI·Tech",
+    "kr": "한국시장", "chart_kr": "차트(KR)",
 }
 
 
@@ -310,11 +309,19 @@ def _truncate_to_date(data, cutoff):
     return out
 
 
-def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None, source_date=None):
+def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None, source_date=None,
+          require_narrative=False):
     """
     historical_date: datetime.date | 'YYYY-MM-DD' 문자열. 지정하면 그 날짜 마감 기준
     데이터로 과거 시점 리포트를 재현한다(예: 특정 날짜의 버터대디/증시각도기 콘텐츠에
     맞춰 리포트를 다시 만들고 싶을 때). 생략하면 항상 최신 데이터를 사용한다.
+
+    require_narrative: True면 AI 총평 생성에 실패했을 때 발행(파일 쓰기·Pages 게시)
+    없이 중단하고 skipped="narrative_unavailable"을 반환한다. 자막 지연 반영용
+    조용한 재발행(trigger.recheck_pending_updates)에서 쓴다 — 총평 생성이 일시적
+    API 오류 등으로 실패하면 규칙 기반 요약으로 열화된 리포트가 만들어지는데,
+    그게 이미 발행돼 있던 멀쩡한 리포트를 소리 없이 덮어써버린 실사고가 있었다
+    (2026-07-22, 미국 7/21 마감 리포트). 기존 리포트 유지가 항상 낫다.
 
     source_date: 원천 콘텐츠(버터대디/증시각도기) 매칭에 쓸 날짜를 직접 지정한다.
     생략하면 기존처럼 ref_date+1(us)/ref_date(kr) 공식으로 자동 계산하는데, 주말
@@ -432,16 +439,15 @@ def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None,
         print(f"  - {k}:", v["title"][:40] if v else "없음(미발행)")
     src_list = srcmod.list_recent_sources(session, ref_date, want_date_override=source_date)
 
-    print("· AI-Tech 뉴스 확인…")
-    aitech_md, aitech_date = ai_tech.get_ai_tech_markdown(session, datetime.datetime.now(KST).date())
-    print("  →", f"{aitech_date.isoformat()} 발행분 확인" if aitech_md else "없음(미발행)")
-
     # 총평 (원천 콘텐츠 우선, 없으면 웹서치)
     print("· 총평 생성…")
     digest = build_digest(session, yf_data, kr_idx, mc, money, summary, breadth)
     narr = narrative.generate(session, digest, now_kst, sources=src)
     narr = _reject_unverified_index_superlatives(narr)
     print("  →", "성공" if narr else "생략(규칙 기반 대체)")
+    if require_narrative and not narr:
+        print("  ! 총평 생성 실패 — 기존 발행본을 유지하기 위해 재발행을 중단합니다")
+        return dict(skipped="narrative_unavailable", session=session)
 
     # 차트
     print("· 차트 생성…")
@@ -469,25 +475,23 @@ def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None,
         gap_info = dict(display_date=display_ref, weekday_kr=weekday_kr, market_ref=ref_str, title=report_title)
 
     # 매칭된 원천(버터대디/증시각도기) 중 자막이 아직 안 붙어 설명란으로만
-    # 채워진(status=transcript_pending) 게 있거나, AI-Tech 뉴스 파일이 아직
-    # 발행 전이면, 나중에 늦게 들어왔을 때 trigger.py가 이 리포트를 자동으로
-    # 재발행할 수 있도록 마커를 남겨둔다.
+    # 채워진(status=transcript_pending) 게 있으면, 나중에 자막이 늦게 들어왔을 때
+    # trigger.py가 이 리포트를 자동으로 재발행할 수 있도록 마커를 남겨둔다.
+    # (AI-Tech 섹션은 2026-07-22 리포트 파이프라인에서 분리 — 생성·적재는
+    #  ai-tech-briefing.yml 워크플로우가 독립적으로 계속하며, 여기서는 더 이상
+    #  기다리지도 재발행 사유로 삼지도 않는다. 재발행 트리거가 줄어 파이프라인이
+    #  단순해지고, 조용한 재발행 관련 사고 여지도 줄어든다.)
     pending = {v["post_id"]: len(v.get("raw_content") or "")
                for v in src_raw.values() if v and v.get("status") == "transcript_pending"}
-    aitech_missing = aitech_md is None
     marker_dir = os.path.join("out", ".triggers")
     marker_path = os.path.join(marker_dir, f"{session}_{archive_key}.pending.json")
-    if pending or aitech_missing:
+    if pending:
         os.makedirs(marker_dir, exist_ok=True)
         with open(marker_path, "w", encoding="utf-8") as f:
             json.dump(dict(session=session, theme=theme, source_date=want_date.isoformat(),
                            archive_date=archive_key, pending=pending,
-                           aitech_missing=aitech_missing,
                            first_seen=datetime.datetime.now(KST).isoformat()), f, ensure_ascii=False)
-        reasons = []
-        if pending: reasons.append(f"자막 대기 {len(pending)}건")
-        if aitech_missing: reasons.append("AI-Tech 미발행")
-        print(f"  ({' · '.join(reasons)} — 추후 자동 재발행 대상으로 표시)")
+        print(f"  (자막 대기 {len(pending)}건 — 추후 자동 재발행 대상으로 표시)")
     elif os.path.exists(marker_path):
         os.remove(marker_path)
 
@@ -504,7 +508,7 @@ def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None,
     for th in theme_list:
         html = render(session, ref_str, now_kst, yf_data, kr_idx, kr_stk, money,
                       charts_us, charts_kr, summary, mc, breadth, flows, narr, th, rs, src, credit_interp,
-                      fed_odds, src_list, aitech_md, aitech_date, gap_info, upcoming_events)
+                      fed_odds, src_list, gap_info, upcoming_events)
         base = f"out/briefing_{session}_{th}_{archive_key.replace('-','')}"
         fn = base + ".html"
         with open(fn, "w", encoding="utf-8") as f:
@@ -606,7 +610,7 @@ def build_digest(session, yf_data, kr_idx, mc, money, summary, breadth):
 # ══════════════════════════════════════════════════════════════
 def render(session, ref, now, yf_data, kr_idx, kr_stk, money,
            charts_us, charts_kr, summary, mc, breadth, flows, narr, theme="coinbase", rs=None, src=None,
-           credit_interp=None, fed_odds=None, src_list=None, aitech_md=None, aitech_date=None, gap_info=None,
+           credit_interp=None, fed_odds=None, src_list=None, gap_info=None,
            events=None):
     css = themes.get_css(theme, CSS)
     kr_all = {**kr_idx, **kr_stk}
@@ -705,12 +709,11 @@ def render(session, ref, now, yf_data, kr_idx, kr_stk, money,
         "chart_us": section("chart_us", "Charts · US", "주요 차트 (미국)", "종가 + MA10 / 50 / 200", chart_grid(charts_us)),
         "kr":      section("kr", "KR Market", "한국 시장", "지수 · 시총 수준 · 예탁금 · 신용잔고 · 관심종목", kr_block),
         "chart_kr": section("chart_kr", "Charts · KR", "주요 차트 (한국)", "종가 + MA10 / 50 / 200", chart_grid(charts_kr)),
-        "aitech":   render_ai_tech(aitech_md, aitech_date),
     }
     if session == "us":
-        order = ["macro", "fed", "us_idx", "global", "semi", "sectors", "rs", "m7", "chart_us", "kr", "chart_kr", "aitech"]
+        order = ["macro", "fed", "us_idx", "global", "semi", "sectors", "rs", "m7", "chart_us", "kr", "chart_kr"]
     else:
-        order = ["kr", "chart_kr", "macro", "fed", "us_idx", "semi", "sectors", "rs", "m7", "global", "chart_us", "aitech"]
+        order = ["kr", "chart_kr", "macro", "fed", "us_idx", "semi", "sectors", "rs", "m7", "global", "chart_us"]
     body_sections = "".join(S[k] for k in order)
     nav_keys = ["narr"] + (["sources"] if source_list_html else []) + [k for k in order if S[k]]
     nav_html = render_nav(nav_keys)
@@ -889,19 +892,6 @@ def render_source_list(src_list):
       <h2>주요 블로그 및 영상</h2>
       <div class="srcl-card">{rows}</div>
     </section>{script}'''
-
-
-def render_ai_tech(md_text, file_date):
-    if not md_text:
-        return ""
-    import markdown as md
-    body_html = md.markdown(md_text, extensions=["extra", "sane_lists"])
-    date_s = file_date.isoformat() if file_date else ""
-    return f'''<section class="brief" id="aitech">
-      <div class="eyebrow"><span class="badge">AI · Tech</span><span class="sub">{date_s} 발행</span></div>
-      <h2>AI-Tech 뉴스</h2>
-      <div class="ov-card aitech-body">{body_html}</div>
-    </section>'''
 
 
 def render_fed_odds(fed_list):
