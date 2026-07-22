@@ -60,6 +60,20 @@ def _mark_done(session, date_str, reason):
         json.dump({"reason": reason, "at": datetime.datetime.now(SGT).isoformat()}, f, ensure_ascii=False)
 
 
+def _email_marker_path(session, date_str):
+    return os.path.join(MARKER_DIR, f"{session}_{date_str}.email_sent")
+
+
+def _email_already_sent(session, date_str):
+    return os.path.exists(_email_marker_path(session, date_str))
+
+
+def _mark_email_sent(session, date_str):
+    os.makedirs(MARKER_DIR, exist_ok=True)
+    with open(_email_marker_path(session, date_str), "w", encoding="utf-8") as f:
+        json.dump({"at": datetime.datetime.now(SGT).isoformat()}, f, ensure_ascii=False)
+
+
 def check_and_run(now_sgt=None, dry_run=False):
     now_sgt = now_sgt or datetime.datetime.now(SGT)
     date_str = now_sgt.date().isoformat()
@@ -76,6 +90,15 @@ def check_and_run(now_sgt=None, dry_run=False):
         if t < start:
             continue
         if _already_done(session, date_str):
+            # 콘텐츠는 이미 발행됐지만(마커 파일 또는 manifest.json 기준) 이 실행이
+            # 그걸 직접 만든 게 아닐 수 있다 — 예: 디버깅 중 수동으로 briefing.build()를
+            # 돌려 site만 갱신한 경우, 정식 자동화 흐름(이 함수)이 한 번도 실행되지
+            # 않아 이메일이 영영 발송되지 않는 사고가 있었다(2026-07-21 KR 리포트 실사고).
+            # 재발 방지를 위해 최소한 눈에 띄는 경고라도 남긴다.
+            if not _email_already_sent(session, date_str):
+                print(f"[{session}] ! 경고 — {date_str} 리포트는 이미 발행됐지만 이메일 발송 "
+                      "기록이 없습니다(수동 재발행 등으로 자동 이메일 발송 절차를 건너뛰었을 "
+                      "가능성). 필요 시 수동으로 이메일 발송 여부를 확인하세요.")
             continue
 
         import sources
@@ -121,7 +144,8 @@ def check_and_run(now_sgt=None, dry_run=False):
                 continue
             _, fn, pdf, report_url, viewer_url = result["outputs"][0]
             fired.append((session, reason, fn))
-            _send_report_email(result, viewer_url)
+            if _send_report_email(result, viewer_url):
+                _mark_email_sent(session, date_str)
         else:
             fired.append((session, reason, None))
     return fired
@@ -143,8 +167,10 @@ def _send_report_email(result, viewer_url):
         html_body = delivery.build_email_html(*args, link_url=viewer_url or "", events=events)
         delivery.send_email(subject, body, [], html_body=html_body)
         print(f"  → 이메일 발송 완료 ({subject})")
+        return True
     except Exception as e:
         print("  ! 이메일 발송 실패:", repr(e)[:200])
+        return False
 
 
 PENDING_RETRY_HOURS = 6  # naver-blog-kakao-notifier의 TRANSCRIPT_RETRY_HOURS(자막 재시도 포기 시한)과 맞춤

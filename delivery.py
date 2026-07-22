@@ -285,13 +285,27 @@ def send_email(subject, body_text, pdf_paths, to_addr=None, html_body=None):
         with open(p, "rb") as f:
             msg.add_attachment(f.read(), maintype="application", subtype="pdf", filename=p.name)
 
-    if port == 465:
-        with smtplib.SMTP_SSL(host, port) as s:
-            s.login(sender, password)
-            s.send_message(msg)
-    else:
-        with smtplib.SMTP(host, port) as s:
-            s.starttls()
-            s.login(sender, password)
-            s.send_message(msg)
-    return {"sent_to": receiver, "attachments": [pathlib.Path(p).name for p in pdf_paths]}
+    # GitHub Actions 러너 IP에서 Gmail SMTP로의 연결이 일시적으로 끊기거나
+    # 거부되는 경우가 있다(클라우드/데이터센터 IP 대상 일시적 차단은 흔함 —
+    # 같은 계정의 다른 프로젝트에서 YouTube 안티봇에 GH Actions IP가 막힌
+    # 전례도 있음). 재시도 없이 한 번 실패하면 그날 이메일이 통째로 누락되므로
+    # 지수 백오프로 재시도한다.
+    import time
+    last_err = None
+    for attempt in range(3):
+        try:
+            if port == 465:
+                with smtplib.SMTP_SSL(host, port, timeout=30) as s:
+                    s.login(sender, password)
+                    s.send_message(msg)
+            else:
+                with smtplib.SMTP(host, port, timeout=30) as s:
+                    s.starttls()
+                    s.login(sender, password)
+                    s.send_message(msg)
+            return {"sent_to": receiver, "attachments": [pathlib.Path(p).name for p in pdf_paths]}
+        except Exception as e:
+            last_err = e
+            if attempt < 2:
+                time.sleep(5 * (attempt + 1))
+    raise last_err
