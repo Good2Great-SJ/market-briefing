@@ -290,7 +290,7 @@ def recheck_pending_updates(now_sgt=None):
         # 없이 설명란만으로 확정된 경우엔 내용이 그대로라 다시 빌드해봐야 무의미
         # 하다 — 실제로 분량이 늘어난 경우만 "해결됨"으로 본다.
         still_pending, resolved, reasons = {}, False, []
-        for pid, baseline_len in marker["pending"].items():
+        for pid, baseline_len in marker.get("pending", {}).items():
             post = sources.get_post_by_id(pid)
             rclen = len(post.get("raw_content") or "") if post else baseline_len
             if post and post.get("status") != "transcript_pending" and rclen > baseline_len + 100:
@@ -298,6 +298,21 @@ def recheck_pending_updates(now_sgt=None):
                 reasons.append("자막 반영")
             else:
                 still_pending[pid] = baseline_len
+
+        # 빌드 당시 아예 없었거나 분량 미달로 제외됐던 소스가 뒤늦게 발행됐는지도
+        # 확인한다. 하드스톱(예: KR 19:00) 이후에야 올라오는 글 — 버터대디 한국장
+        # 리캡이 21시대에 올라온 2026-07-22 실사례 — 은 자막 대기 감지만으로는
+        # 영영 총평에 반영되지 않았다.
+        still_missing = list(marker.get("missing_sources", []))
+        if still_missing:
+            want = datetime.date.fromisoformat(marker["source_date"])
+            src_now = sources.get_sources_for_label_date(want, marker["session"])
+            newly = [k for k in still_missing
+                     if src_now.get(k) and len(src_now[k].get("raw_content") or "") >= 300]
+            if newly:
+                resolved = True
+                reasons.append("늦게 발행된 원문 반영(" + ", ".join(newly) + ")")
+                still_missing = [k for k in still_missing if k not in newly]
 
         if resolved:
             print(f"[재발행] {marker['session']} {marker['archive_date']} — {' · '.join(reasons)}, 리포트 갱신")
@@ -327,8 +342,9 @@ def recheck_pending_updates(now_sgt=None):
             continue
 
         elapsed_h = (now_sgt - datetime.datetime.fromisoformat(marker["first_seen"])).total_seconds() / 3600
-        if still_pending and elapsed_h < PENDING_RETRY_HOURS:
+        if (still_pending or still_missing) and elapsed_h < PENDING_RETRY_HOURS:
             marker["pending"] = still_pending
+            marker["missing_sources"] = still_missing
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(marker, f, ensure_ascii=False)
         else:

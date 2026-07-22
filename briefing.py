@@ -29,8 +29,16 @@ import narrative
 import themes
 import sources as srcmod
 
-for _f in ("Malgun Gothic", "Apple SD Gothic Neo", "NanumGothic", "DejaVu Sans"):
+import matplotlib.font_manager as _fm
+
+# rcParams["font.family"] 대입은 폰트가 실제로 있는지 검증하지 않고 그냥
+# 문자열을 저장할 뿐이라 이 루프가 항상 첫 후보("Malgun Gothic")에서 break돼
+# 버렸다 — GitHub Actions(Ubuntu) 러너엔 그 폰트가 없어 렌더링 시점에야 조용히
+# DejaVu Sans(한글 미지원)로 대체되고, 차트 속 종목명이 전부 깨져 나왔다.
+# findfont(fallback_to_default=False)로 실제 설치 여부를 확인해야 한다.
+for _f in ("NanumGothic", "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", "DejaVu Sans"):
     try:
+        _fm.findfont(_fm.FontProperties(family=_f), fallback_to_default=False)
         plt.rcParams["font.family"] = _f
         break
     except Exception:
@@ -483,15 +491,25 @@ def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None,
     #  단순해지고, 조용한 재발행 관련 사고 여지도 줄어든다.)
     pending = {v["post_id"]: len(v.get("raw_content") or "")
                for v in src_raw.values() if v and v.get("status") == "transcript_pending"}
+    # 총평 근거가 아예 비어 있던 소스도 기록한다(미발행 or 분량 미달 제외).
+    # 하드스톱 이후에야 글이 올라오는 경우가 실제로 잦은데(예: 버터대디 한국장
+    # 리캡이 21시대 발행, 2026-07-22 실사례) 자막 대기 감지만으로는 이런 늦은
+    # 발행이 영영 총평에 반영되지 않았다 — trigger.recheck가 이 목록을 보고
+    # 늦게 올라온 원문을 감지해 재발행한다.
+    missing_sources = [k for k, v in src.items() if not v]
     marker_dir = os.path.join("out", ".triggers")
     marker_path = os.path.join(marker_dir, f"{session}_{archive_key}.pending.json")
-    if pending:
+    if pending or missing_sources:
         os.makedirs(marker_dir, exist_ok=True)
         with open(marker_path, "w", encoding="utf-8") as f:
             json.dump(dict(session=session, theme=theme, source_date=want_date.isoformat(),
                            archive_date=archive_key, pending=pending,
+                           missing_sources=missing_sources,
                            first_seen=datetime.datetime.now(KST).isoformat()), f, ensure_ascii=False)
-        print(f"  (자막 대기 {len(pending)}건 — 추후 자동 재발행 대상으로 표시)")
+        msgs = []
+        if pending: msgs.append(f"자막 대기 {len(pending)}건")
+        if missing_sources: msgs.append(f"원문 미발행 {len(missing_sources)}건({', '.join(missing_sources)})")
+        print(f"  ({' · '.join(msgs)} — 추후 자동 재발행 대상으로 표시)")
     elif os.path.exists(marker_path):
         os.remove(marker_path)
 

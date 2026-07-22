@@ -260,11 +260,13 @@ def send_email(subject, body_text, pdf_paths, to_addr=None, html_body=None):
     import smtplib
     from email.message import EmailMessage
 
-    host = os.getenv("EMAIL_SMTP_HOST", "smtp.gmail.com")
-    port = int(os.getenv("EMAIL_SMTP_PORT", "587"))
-    sender = os.getenv("EMAIL_SENDER")
-    password = os.getenv("EMAIL_APP_PASSWORD")
-    receiver = to_addr or os.getenv("EMAIL_RECEIVER")
+    # GitHub Secrets 등록 시 값 끝에 줄바꿈/공백이 딸려 들어가는 경우가 있는데,
+    # 이메일 헤더에 줄바꿈이 섞이면 smtplib가 발송을 거부한다 — 항상 strip.
+    host = (os.getenv("EMAIL_SMTP_HOST") or "smtp.gmail.com").strip()
+    port = int((os.getenv("EMAIL_SMTP_PORT") or "587").strip())
+    sender = (os.getenv("EMAIL_SENDER") or "").strip()
+    password = (os.getenv("EMAIL_APP_PASSWORD") or "").strip()
+    receiver = (to_addr or os.getenv("EMAIL_RECEIVER") or "").strip()
 
     if not sender or not password or not receiver:
         raise RuntimeError(

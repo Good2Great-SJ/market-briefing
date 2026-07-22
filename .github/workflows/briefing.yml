@@ -20,6 +20,14 @@ permissions:
   contents: write
   actions: write  # 봇 커밋 후 Deploy Pages를 workflow_dispatch로 직접 깨우기 위함
 
+# GH Actions 자체 schedule과 cron-job.org의 workflow_dispatch가 같은 시각대에
+# 겹쳐 동시에 돌면, 서로 같은 마커/리포트를 만들고 커밋 push가 충돌한다 —
+# 한 번에 하나만 돌도록 직렬화한다(cancel 대신 대기: 뒤 실행은 앞 실행이 만든
+# 마커를 보고 스스로 "이미 발행됨"으로 건너뛰므로 안전).
+concurrency:
+  group: briefing-trigger
+  cancel-in-progress: false
+
 jobs:
   check-and-build:
     runs-on: ubuntu-latest
@@ -43,6 +51,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      # ubuntu-latest 러너엔 한글 폰트가 아예 없어 차트에 들어가는 종목명이
+      # matplotlib 기본 폰트(DejaVu Sans, 한글 미지원)로 렌더링되며 깨져 나왔다.
+      - name: 한글 폰트 설치 (차트 종목명용)
+        run: sudo apt-get update && sudo apt-get install -y fonts-nanum
 
       - name: Install dependencies
         working-directory: market-briefing
