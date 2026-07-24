@@ -45,6 +45,7 @@ for _f in ("NanumGothic", "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR"
         continue
 plt.rcParams["axes.unicode_minus"] = False
 KST = datetime.timezone(datetime.timedelta(hours=9))
+BLOG_HOME = "https://doleman.tistory.com"
 
 
 # ══════════════════════════════════════════════════════════════
@@ -757,6 +758,17 @@ def render(session, ref, now, yf_data, kr_idx, kr_stk, money,
 <title>{title} · {gap_info['display_date'] if gap_info else ref}</title>
 <style>
 {css}
+.g2g-blog-bridge{{max-width:1120px;margin:44px auto 0;padding:0 24px;}}
+.g2g-blog-card{{display:flex;align-items:center;justify-content:space-between;gap:22px;padding:22px 24px;border:1px solid var(--hair);border-radius:18px;background:var(--soft);box-shadow:0 12px 30px rgba(22,82,240,.07);}}
+.g2g-blog-kicker{{color:var(--primary);font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;}}
+.g2g-blog-title{{margin-top:6px;color:var(--ink);font-size:18px;font-weight:800;letter-spacing:-.03em;}}
+.g2g-blog-copy{{margin-top:5px;color:var(--muted);font-size:12.5px;line-height:1.6;}}
+.g2g-blog-link{{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:11px 17px;border-radius:12px;background:var(--primary);color:#fff!important;font-size:13px;font-weight:750;text-decoration:none!important;}}
+@media(max-width:640px){{
+  .g2g-blog-bridge{{padding:0 14px;}}
+  .g2g-blog-card{{display:block;padding:20px;}}
+  .g2g-blog-link{{display:flex;margin-top:16px;width:100%;}}
+}}
 </style>
 
 <div class="hero">
@@ -774,6 +786,17 @@ def render(session, ref, now, yf_data, kr_idx, kr_stk, money,
   {narr_html}
   {source_list_html}
   {body_sections}
+</div>
+
+<div class="g2g-blog-bridge">
+  <div class="g2g-blog-card">
+    <div>
+      <div class="g2g-blog-kicker">Good To Great · Market Story</div>
+      <div class="g2g-blog-title">숫자의 배경과 오늘의 관전 포인트</div>
+      <div class="g2g-blog-copy">데이터가 의미하는 시장 흐름은 블로그 해설에서 더 쉽게 읽을 수 있습니다.</div>
+    </div>
+    <a class="g2g-blog-link" href="{BLOG_HOME}/?utm_source=market_briefing&amp;utm_medium=referral&amp;utm_campaign=report_return_{session}_{ref}" target="_top">오늘의 해설 읽기 →</a>
+  </div>
 </div>
 
 <footer>
