@@ -44,15 +44,40 @@
   .blog-link{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:8px 13px;border:1px solid var(--hair);border-radius:10px;background:var(--strong);color:var(--primary);font-size:12.5px;font-weight:750;text-decoration:none;white-space:nowrap;}
   .blog-link:hover{border-color:var(--primary);}
   .status{font-size:12px;color:var(--muted);white-space:nowrap;}
-  .promo{flex-shrink:0;display:flex;align-items:center;gap:10px;padding:9px 18px;text-decoration:none;
+  .promo{flex-shrink:0;display:flex;align-items:center;gap:10px;padding:9px 18px;
     background:linear-gradient(90deg,var(--primary),#3b7af7);color:#fff;font-size:13px;}
-  .promo:hover{filter:brightness(1.06);}
+  .promo-main{display:flex;flex:1;min-width:0;align-items:center;gap:10px;color:#fff;text-decoration:none;}
+  .promo-main:hover{filter:brightness(1.06);}
   .promo-badge{flex-shrink:0;background:rgba(255,255,255,.18);border-radius:100px;padding:3px 10px;
     font-size:10.5px;font-weight:800;letter-spacing:.08em;}
   .promo-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .promo-text b{font-weight:800;}
-  .promo-cta{flex-shrink:0;margin-left:auto;font-weight:700;white-space:nowrap;}
+  .promo-cta{flex-shrink:0;margin-left:auto;font-weight:700;white-space:nowrap;display:inline-block;}
+  .promo-replay{flex-shrink:0;background:rgba(255,255,255,.16);color:#fff;border:1px solid rgba(255,255,255,.35);
+    border-radius:100px;padding:4px 12px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap;}
+  .promo-replay:hover{background:rgba(255,255,255,.28);}
+  .promo-flash .promo-cta{animation:pmPulse 1.5s ease;}
+  @keyframes pmPulse{0%{transform:scale(1);}25%{transform:scale(1.22);text-shadow:0 0 16px rgba(255,255,255,.95);}100%{transform:scale(1);}}
   @media(max-width:720px){ .promo{padding:8px 12px;font-size:12px;} .promo-desc{display:none;} }
+
+  /* ── 홍보 영상 팝업 ── */
+  #promoModal{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;}
+  .pm-backdrop{position:absolute;inset:0;background:rgba(4,8,22,.74);opacity:0;transition:opacity .45s ease;}
+  .pm-box{position:relative;width:min(880px,93vw);border-radius:18px;overflow:hidden;background:#04101e;
+    box-shadow:0 30px 90px rgba(0,0,0,.55);transform:scale(.18);opacity:0;
+    transition:transform .6s cubic-bezier(.2,.9,.3,1.15),opacity .45s ease;}
+  #promoModal.pm-open .pm-backdrop{opacity:1;}
+  #promoModal.pm-open .pm-box{transform:scale(1);opacity:1;}
+  #pmVideo{display:block;width:100%;cursor:pointer;}
+  .pm-top{position:absolute;top:10px;right:10px;left:10px;display:flex;justify-content:space-between;gap:8px;}
+  .pm-btn{background:rgba(2,10,25,.55);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:100px;
+    padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;backdrop-filter:blur(4px);}
+  .pm-btn:hover{background:rgba(2,10,25,.8);}
+  .pm-cta{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);white-space:nowrap;
+    background:rgba(2,10,25,.6);border:1px solid rgba(255,255,255,.35);backdrop-filter:blur(4px);
+    color:#fff;text-decoration:none;font-size:13px;font-weight:750;border-radius:100px;padding:9px 18px;}
+  .pm-cta:hover{background:var(--primary);border-color:var(--primary);}
+  @media(max-width:720px){ .pm-cta{font-size:11.5px;padding:8px 13px;} .pm-btn{font-size:11px;padding:5px 10px;} }
   .frame-wrap{flex:1;min-height:0;display:flex;flex-direction:column;}
   iframe{flex:1;min-height:0;width:100%;border:none;display:block;background:var(--bg);}
   .empty{display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:14px;text-align:center;padding:20px;}
@@ -78,11 +103,29 @@
     <span class="status" id="status"></span>
     <span class="status" id="visitors" title="오늘 방문자 수 (GoatCounter 집계)"></span>
   </div>
-  <a class="promo" href="https://doleman.tistory.com/?utm_source=market_briefing&amp;utm_medium=banner&amp;utm_campaign=viewer_promo" target="_blank" rel="noopener">
-    <span class="promo-badge">BLOG</span>
-    <span class="promo-text"><b>세상을 읽는 지식 창고</b><span class="promo-desc"> — 시장·경제·기술을 쉽게 풀어내는 해설 블로그</span></span>
-    <span class="promo-cta">방문하기 →</span>
-  </a>
+  <div class="promo">
+    <a class="promo-main" href="https://doleman.tistory.com/?utm_source=market_briefing&amp;utm_medium=banner&amp;utm_campaign=viewer_promo" target="_blank" rel="noopener">
+      <span class="promo-badge">BLOG</span>
+      <span class="promo-text"><b>세상을 읽는 지식 창고</b><span class="promo-desc"> — 시장·경제·기술을 쉽게 풀어내는 해설 블로그</span></span>
+      <span class="promo-cta">방문하기 →</span>
+    </a>
+    <button class="promo-replay" id="promoReplay" title="홍보 영상 다시보기">▶ 영상</button>
+  </div>
+
+  <!-- doleman 홍보 영상 팝업: 하루 1회 자동 재생, 종료 시 배너 버튼으로 디졸브 -->
+  <div id="promoModal" hidden>
+    <div class="pm-backdrop" id="pmBackdrop"></div>
+    <div class="pm-box" id="pmBox">
+      <video id="pmVideo" src="assets/promo/doleman-promo-web.mp4" playsinline muted preload="metadata"></video>
+      <div class="pm-top">
+        <button class="pm-btn" id="pmSound">🔇 소리 켜기</button>
+        <button class="pm-btn" id="pmClose">건너뛰기 ✕</button>
+      </div>
+      <a class="pm-cta" id="pmCta" href="https://doleman.tistory.com/?utm_source=market_briefing&amp;utm_medium=promo_video&amp;utm_campaign=intro" target="_blank" rel="noopener">
+        세상을 읽는 지식 창고 · doleman 방문하기 →
+      </a>
+    </div>
+  </div>
   <div class="frame-wrap" id="frameWrap">
     <div class="empty">리포트를 불러오는 중입니다…</div>
   </div>
@@ -223,6 +266,76 @@ loadManifest(false).then(() => { if (manifest.length) selectInitial(); });
         `오늘 방문 ${String(data.count).trim()}명`;
     }
   }catch(e){ /* 집계 서비스 장애 시 조용히 생략 */ }
+})();
+
+// ── doleman 홍보 영상 팝업 ──────────────────────────────────────
+// 페이지 진입 시 하루 1회 자동으로 확대되며 재생되고, 끝나면 상단 배너의
+// "방문하기" 버튼 위치로 축소·디졸브되며 흡수된다(버튼이 잠깐 반짝여 시선 유도).
+// 소리는 브라우저 자동재생 정책상 무음으로 시작(버튼으로 켜기). 배너의
+// "▶ 영상" 버튼으로 언제든 다시 볼 수 있다.
+(function(){
+  const modal = document.getElementById("promoModal");
+  const box = document.getElementById("pmBox");
+  const backdrop = document.getElementById("pmBackdrop");
+  const video = document.getElementById("pmVideo");
+  const soundBtn = document.getElementById("pmSound");
+  const closeBtn = document.getElementById("pmClose");
+  const replayBtn = document.getElementById("promoReplay");
+  const banner = document.querySelector(".promo");
+  const BLOG_URL = "https://doleman.tistory.com/?utm_source=market_briefing&utm_medium=promo_video&utm_campaign=intro";
+  const SEEN_KEY = "doleman_promo_seen";
+  let closing = false;
+
+  function openModal(){
+    closing = false;
+    modal.hidden = false;
+    box.style.transition = ""; box.style.transform = ""; box.style.opacity = "";
+    video.muted = true;
+    soundBtn.textContent = "🔇 소리 켜기";
+    requestAnimationFrame(() => requestAnimationFrame(() => modal.classList.add("pm-open")));
+    video.currentTime = 0;
+    video.play().catch(() => {});
+  }
+
+  function dissolveToBanner(){
+    if (closing) return;
+    closing = true;
+    video.pause();
+    const target = banner.querySelector(".promo-cta") || banner;
+    const t = target.getBoundingClientRect();
+    const b = box.getBoundingClientRect();
+    const dx = (t.left + t.width / 2) - (b.left + b.width / 2);
+    const dy = (t.top + t.height / 2) - (b.top + b.height / 2);
+    box.style.transition = "transform .8s cubic-bezier(.55,0,.75,.35), opacity .75s ease";
+    box.style.transform = `translate(${dx}px, ${dy}px) scale(.04)`;
+    box.style.opacity = "0";
+    backdrop.style.opacity = "0";
+    setTimeout(() => {
+      modal.classList.remove("pm-open");
+      modal.hidden = true;
+      banner.classList.add("promo-flash");
+      setTimeout(() => banner.classList.remove("promo-flash"), 1600);
+    }, 800);
+  }
+
+  video.addEventListener("ended", dissolveToBanner);
+  closeBtn.addEventListener("click", dissolveToBanner);
+  backdrop.addEventListener("click", dissolveToBanner);
+  soundBtn.addEventListener("click", () => {
+    video.muted = !video.muted;
+    soundBtn.textContent = video.muted ? "🔇 소리 켜기" : "🔊 소리 끄기";
+  });
+  video.addEventListener("click", () => { window.open(BLOG_URL, "_blank", "noopener"); dissolveToBanner(); });
+  replayBtn.addEventListener("click", openModal);
+
+  const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  let seen = null;
+  try{ seen = localStorage.getItem(SEEN_KEY); }catch(e){}
+  if (seen !== today){
+    try{ localStorage.setItem(SEEN_KEY, today); }catch(e){}
+    // 리포트 첫 로딩과 겹치지 않게 잠깐 뒤에 등장
+    setTimeout(openModal, 700);
+  }
 })();
 </script>
 
