@@ -62,6 +62,15 @@
 
   /* ── 홍보 영상 팝업 ── */
   #promoModal{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;}
+  /* hidden 속성의 display:none(UA 스타일)은 위 ID 선택자의 display:flex에 밀려 무시된다 —
+     그 결과 닫힌 뒤에도(그리고 열리기 전에도) 투명한 전체 화면 오버레이가 남아
+     스크롤과 클릭(배너의 '▶ 영상' 버튼 포함)을 전부 가로채는 치명적 문제가 있었다
+     (2026-07-24 실사고). 명시적으로 눌러준다. */
+  #promoModal[hidden]{display:none;}
+  /* hidden 속성의 display:none(UA 스타일)은 위 ID 선택자의 display:flex에 밀려 무시된다 —
+     그 결과 닫힌 뒤에도 투명한 전체 화면 오버레이가 남아 스크롤/클릭을 전부 가로채는
+     치명적 문제가 있었다(2026-07-24 실사고). 명시적으로 눌러준다. */
+  #promoModal[hidden]{display:none;}
   .pm-backdrop{position:absolute;inset:0;background:rgba(4,8,22,.74);opacity:0;transition:opacity .45s ease;}
   .pm-box{position:relative;width:min(880px,93vw);border-radius:18px;overflow:hidden;background:#04101e;
     box-shadow:0 30px 90px rgba(0,0,0,.55);transform:scale(.18);opacity:0;
