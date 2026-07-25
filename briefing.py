@@ -887,10 +887,13 @@ def _paragraphs(text):
     return html
 
 
+SRCL_VISIBLE_COUNT = 8  # 기본으로 보여줄 항목 수, 나머지는 "더보기"로 펼침
+
+
 def render_source_list(src_list):
     if not src_list:
         return ""
-    rows = ""
+    row_htmls = []
     for i, it in enumerate(src_list):
         summary = (it.get("summary") or "").strip()
         lines = [ln.strip() for ln in summary.split("\n") if ln.strip()]
@@ -902,28 +905,46 @@ def render_source_list(src_list):
         if not lines:
             # 요약이 아직 없는 항목은 "준비 중" 문구 없이 제목·링크만 간결하게 —
             # 문구 유무에 따라 행 높이가 들쑥날쑥해지는 것을 방지한다.
-            rows += f'''<div class="srcl-row">
+            row_htmls.append(f'''<div class="srcl-row">
               {meta}
               <div class="srcl-actions"><a class="srcl-link" href="{it["url"]}" target="_blank" rel="noopener">원문 보기 ↗</a></div>
-            </div>'''
+            </div>''')
             continue
         # 차지하는 공간을 줄이기 위해 요약은 기본적으로 전부 접어두고 제목만
-        # 보여준다("더보기"를 눌러야 전체 내용이 펼쳐짐).
+        # 보여준다("펼치기"를 눌러야 전체 내용이 펼쳐짐).
         all_html = "".join(f"<p>{ln}</p>" for ln in lines)
-        rows += f'''<div class="srcl-row">
+        row_htmls.append(f'''<div class="srcl-row">
           {meta}
           <div class="srcl-summary-full" id="srcl-full-{i}" style="display:none">{all_html}</div>
           <div class="srcl-actions has-toggle">
-            <button type="button" class="srcl-toggle" onclick="srclToggle(this,{i})">요약 보기 ▾</button>
+            <button type="button" class="srcl-toggle" onclick="srclToggle(this,{i})">펼치기 ▾</button>
             <a class="srcl-link" href="{it["url"]}" target="_blank" rel="noopener">원문 보기 ↗</a>
           </div>
-        </div>'''
+        </div>''')
+
+    # 항목 수가 많으면(주로 소스가 몰리는 날) 카드가 한없이 길어져 스크롤 부담이
+    # 크다 — 상위 SRCL_VISIBLE_COUNT개만 기본 노출하고 나머지는 "더보기"로 펼친다.
+    visible = row_htmls[:SRCL_VISIBLE_COUNT]
+    hidden = row_htmls[SRCL_VISIBLE_COUNT:]
+    rows = "".join(visible)
+    if hidden:
+        rows += f'<div id="srcl-more" style="display:none">{"".join(hidden)}</div>'
+        rows += (f'<div class="srcl-more-row"><button type="button" class="srcl-more-btn" '
+                 f'data-more-label="더보기 ({len(hidden)}개 더) ▾" onclick="srclMoreToggle(this)">'
+                 f'더보기 ({len(hidden)}개 더) ▾</button></div>')
+
     script = '''<script>
     function srclToggle(btn, idx){
       var full = document.getElementById("srcl-full-" + idx);
       var showing = full.style.display !== "none";
       full.style.display = showing ? "none" : "";
-      btn.textContent = showing ? "요약 보기 ▾" : "접기 ▴";
+      btn.textContent = showing ? "펼치기 ▾" : "접기 ▴";
+    }
+    function srclMoreToggle(btn){
+      var more = document.getElementById("srcl-more");
+      var showing = more.style.display !== "none";
+      more.style.display = showing ? "none" : "";
+      btn.textContent = showing ? btn.dataset.moreLabel : "접기 ▴";
     }
     </script>'''
     return f'''<section class="brief" id="sources">
@@ -1158,6 +1179,10 @@ padding:6px 14px;font-size:12px;font-weight:600;color:var(--ink);cursor:pointer;
 .srcl-toggle:hover{background:var(--hair);}
 .srcl-link{font-size:12px;font-weight:600;color:var(--muted);text-decoration:none;white-space:nowrap;}
 .srcl-link:hover{color:var(--primary);text-decoration:underline;}
+.srcl-more-row{padding:14px 20px;}
+.srcl-more-btn{width:100%;background:var(--strong);border:1px solid var(--hair);border-radius:12px;
+padding:10px 14px;font-size:12.5px;font-weight:700;color:var(--ink);cursor:pointer;}
+.srcl-more-btn:hover{background:var(--hair);}
 h2{font-size:29px;font-weight:400;letter-spacing:-.6px;margin:0 0 16px;color:var(--ink);}
 
 /* 총평 */
