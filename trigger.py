@@ -42,14 +42,21 @@ def _already_done(session, date_str):
     if os.path.exists(_marker_path(session, date_str)):
         return True
     # out/ 마커 파일은 워크플로우 자신이 매 실행 뒤 커밋해야 다음 실행에 남는데,
-    # (예: 로컬에서 소스만 수동으로 push하고 out/는 안 올린 경우) 그 커밋이 누락되면
+    # (예: 로컬에서 소스만 수동으로 push하고 out/는 안 올린 경우, 또는 병합 충돌
+    # 해결 중 실수로 지워버린 경우 — 2026-07-25 us 세션 실사고) 그 커밋이 누락되면
     # 마커가 유실돼 이미 발행된 세션을 또 재발행·재발송할 수 있다. docs/manifest.json은
     # 항상 함께 커밋되는 실제 발행 기록이므로 이걸로도 한 번 더 확인한다.
+    #
+    # 주의: manifest 항목의 "date"는 리포트의 ref_date(예: us 세션은 보통 전날)이지
+    # "오늘"이 아니다 — r["date"] == date_str로 비교하면 us 세션에서는 거의 항상
+    # 어긋나 이 안전장치가 사실상 무력화된다(위 실사고의 근본 원인). 대신 실제
+    # "오늘 이미 만들어졌는가"를 뜻하는 generated_at의 날짜 부분으로 비교한다.
     try:
         manifest_path = os.path.join(os.path.dirname(__file__), "docs", "manifest.json")
         with open(manifest_path, encoding="utf-8") as f:
             manifest = json.load(f)
-        return any(r.get("session") == session and r.get("date") == date_str for r in manifest)
+        return any(r.get("session") == session and (r.get("generated_at") or "")[:10] == date_str
+                   for r in manifest)
     except Exception:
         return False
 
