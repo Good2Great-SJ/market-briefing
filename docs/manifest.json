@@ -1,10 +1,10 @@
 [
   {
     "session": "us",
-    "date": "2026-07-24",
+    "date": "2026-07-22",
     "theme": "coinbase",
-    "path": "reports/us_coinbase_20260724.html",
-    "generated_at": "2026-07-25T09:08:47+09:00"
+    "path": "reports/us_coinbase_20260722.html",
+    "generated_at": "2026-07-23T17:02:05+09:00"
   },
   {
     "session": "kr",
@@ -26,13 +26,6 @@
     "theme": "coinbase",
     "path": "reports/kr_coinbase_20260723.html",
     "generated_at": "2026-07-24T08:02:33+09:00"
-  },
-  {
-    "session": "us",
-    "date": "2026-07-22",
-    "theme": "coinbase",
-    "path": "reports/us_coinbase_20260722.html",
-    "generated_at": "2026-07-23T17:02:05+09:00"
   },
   {
     "session": "kr",

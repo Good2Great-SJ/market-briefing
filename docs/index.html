@@ -114,7 +114,7 @@
     <select id="picker"><option>불러오는 중…</option></select>
     <button id="latestBtn" class="ghost">최신으로</button>
     <span class="status" id="status"></span>
-    <span class="status" id="visitors" title="오늘 방문자 수 (GoatCounter 집계)"></span>
+    <span class="status" id="visitors" title="누적 방문자 수 (GoatCounter 집계)"></span>
   </div>
   <div class="promo">
     <a class="promo-main" href="https://doleman.tistory.com/?utm_source=market_briefing&amp;utm_medium=banner&amp;utm_campaign=viewer_promo" target="_blank" rel="noopener">
@@ -260,23 +260,22 @@ latestBtn.addEventListener("click", async () => {
 
 loadManifest(false).then(() => { if (manifest.length) selectInitial(); });
 
-// ── 오늘 방문자 수 표시 (GoatCounter) ──────────────────────────
+// ── 누적 방문자 수 표시 (GoatCounter) ───────────────────────────
 // 정적 호스팅(GitHub Pages)이라 서버 집계가 불가능해 GoatCounter의 공개
-// 카운터 API를 사용한다. 특수 경로 TOTAL = 사이트 전체 합계이며,
-// start/end를 오늘 날짜로 주면 "오늘 방문"만 집계된다. 실패해도 표시만
+// 카운터 API(/counter/TOTAL.json = 사이트 전체 합계)를 사용한다. 이 공개
+// 위젯 API는 원래 "오늘만" 조회 용도가 아니라 누적 총계 표시용이라
+// start/end 날짜 필터를 걸면 부정확하게 집계된다(실측: 무필터 15건인데
+// 오늘 필터 시 0건) — 필터 없이 총계만 표시한다. 실패해도 표시만
 // 생략하고 뷰어 기능에는 영향 없음.
-(async function showTodayVisitors(){
+(async function showTotalVisitors(){
   try{
-    const kstNow = new Date(Date.now() + 9 * 3600 * 1000);
-    const today = kstNow.toISOString().slice(0, 10);
     const res = await fetch(
-      `https://good2great.goatcounter.com/counter/TOTAL.json?start=${today}&end=${today}`,
-      {cache: "no-store"});
+      "https://good2great.goatcounter.com/counter/TOTAL.json", {cache: "no-store"});
     if (!res.ok) return;
     const data = await res.json();
     if (data && data.count !== undefined){
       document.getElementById("visitors").textContent =
-        `오늘 방문 ${String(data.count).trim()}명`;
+        `누적 방문 ${String(data.count).trim()}명`;
     }
   }catch(e){ /* 집계 서비스 장애 시 조용히 생략 */ }
 })();
