@@ -894,14 +894,16 @@ def render_source_list(src_list):
     for i, it in enumerate(src_list):
         summary = (it.get("summary") or "").strip()
         lines = [ln.strip() for ln in summary.split("\n") if ln.strip()]
+        meta = f'''<div class="srcl-meta">
+            <span class="srcl-badge">{it["source"]}</span>
+            <span class="srcl-date">{it["date"]}</span>
+          </div>
+          <div class="srcl-title">{it["title"]}</div>'''
         if not lines:
+            # 요약이 아직 없는 항목은 "준비 중" 문구 없이 제목·링크만 간결하게 —
+            # 문구 유무에 따라 행 높이가 들쑥날쑥해지는 것을 방지한다.
             rows += f'''<div class="srcl-row">
-              <div class="srcl-head">
-                <span class="srcl-badge">{it["source"]}</span>
-                <span class="srcl-title">{it["title"]}</span>
-                <span class="srcl-date mut">{it["date"]}</span>
-              </div>
-              <p class="srcl-summary mut">요약 준비 중입니다.</p>
+              {meta}
               <div class="srcl-actions"><a class="srcl-link" href="{it["url"]}" target="_blank" rel="noopener">원문 보기 ↗</a></div>
             </div>'''
             continue
@@ -909,13 +911,9 @@ def render_source_list(src_list):
         # 보여준다("더보기"를 눌러야 전체 내용이 펼쳐짐).
         all_html = "".join(f"<p>{ln}</p>" for ln in lines)
         rows += f'''<div class="srcl-row">
-          <div class="srcl-head">
-            <span class="srcl-badge">{it["source"]}</span>
-            <span class="srcl-title">{it["title"]}</span>
-            <span class="srcl-date mut">{it["date"]}</span>
-          </div>
+          {meta}
           <div class="srcl-summary-full" id="srcl-full-{i}" style="display:none">{all_html}</div>
-          <div class="srcl-actions">
+          <div class="srcl-actions has-toggle">
             <button type="button" class="srcl-toggle" onclick="srclToggle(this,{i})">요약 보기 ▾</button>
             <a class="srcl-link" href="{it["url"]}" target="_blank" rel="noopener">원문 보기 ↗</a>
           </div>
@@ -1139,17 +1137,22 @@ background:var(--strong);border-radius:100px;padding:4px 11px;flex:0 0 auto;}
   .src-badges{margin-left:0;width:100%;}
 }
 .srcl-card{background:var(--card);border:1px solid var(--hair);border-radius:20px;overflow:hidden;}
-.srcl-row{padding:18px 20px;border-bottom:1px solid var(--hairsoft);}
+.srcl-row{padding:16px 20px;border-bottom:1px solid var(--hairsoft);}
 .srcl-row:last-child{border-bottom:none;}
-.srcl-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+/* 배지·날짜를 제목과 분리된 고정 높이 메타 줄로 빼고, 제목은 2줄로 잘라(clamp)
+   길이에 상관없이 행 높이가 일정하게 맞춰지도록 한다 — 제목 길이에 따라
+   행 높이가 들쑥날쑥해 보이던 문제 개선. */
+.srcl-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;}
 .srcl-badge{flex:0 0 auto;font-size:11px;font-weight:600;color:var(--primary);background:var(--strong);
 border-radius:100px;padding:4px 10px;white-space:nowrap;}
-.srcl-title{flex:1 1 auto;font-size:13.5px;font-weight:600;color:var(--ink);line-height:1.4;min-width:0;}
-.srcl-date{flex:0 0 auto;font-size:12px;font-family:var(--mono);color:var(--muted);white-space:nowrap;}
+.srcl-date{flex:0 0 auto;font-size:11.5px;font-family:var(--mono);color:var(--muted);white-space:nowrap;}
+.srcl-title{font-size:13.5px;font-weight:600;color:var(--ink);line-height:1.45;
+display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 .srcl-summary{margin:10px 0 0;font-size:13.5px;line-height:1.65;color:var(--body);white-space:pre-line;}
 .srcl-summary-full{font-size:13.5px;line-height:1.65;color:var(--body);}
 .srcl-summary-full p{margin:8px 0 0;}
-.srcl-actions{display:flex;align-items:center;justify-content:space-between;margin-top:10px;}
+.srcl-actions{display:flex;align-items:center;justify-content:flex-end;gap:16px;margin-top:10px;}
+.srcl-actions.has-toggle{justify-content:space-between;}
 .srcl-toggle{background:var(--strong);border:1px solid var(--hair);border-radius:100px;
 padding:6px 14px;font-size:12px;font-weight:600;color:var(--ink);cursor:pointer;}
 .srcl-toggle:hover{background:var(--hair);}
