@@ -1,6 +1,15 @@
 [
   {
     "session": "us",
+    "date": "2026-07-27-premarket",
+    "theme": "coinbase",
+    "path": "reports/us_coinbase_20260727premarket.html",
+    "generated_at": "2026-07-27T08:06:24+09:00",
+    "title": "7월 27일(월) 한국증시 장전 리포트",
+    "display_date": "2026-07-27"
+  },
+  {
+    "session": "us",
     "date": "2026-07-24",
     "theme": "coinbase",
     "path": "reports/us_coinbase_20260724.html",
