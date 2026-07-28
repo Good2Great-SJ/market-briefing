@@ -810,15 +810,15 @@ def render(session, ref, now, yf_data, kr_idx, kr_stk, money,
 def render_narrative(narr, summary, src=None, events=None):
     src = src or {}
     src_badges = "".join(
-        f'<a class="src-badge" href="{v["url"]}" target="_blank" rel="noopener">{k} 원문 ↗</a>'
+        f'<a class="src-badge" href="{_html_escape(v["url"])}" target="_blank" rel="noopener">{_html_escape(k)} 원문 ↗</a>'
         for k, v in src.items() if v)
 
     # 체크해야 할 주요 증시 이벤트는 더 이상 총평(narr)에서 뽑지 않는다 — AI가 그날
     # 원문에 언급된 것만 뽑다 보니 내용이 들쭉날쭉했다. FOMC·금통위·만기일·실적
     # 발표일처럼 코드로 일관되게 관리하는 events.py의 확정 일정을 대신 쓴다.
     cal = "".join(
-        f'<div class="cal-row"><span class="cal-d">{e.get("date","")}</span>'
-        f'<span class="cal-e">{e.get("event","")}</span></div>'
+        f'<div class="cal-row"><span class="cal-d">{_html_escape(e.get("date",""))}</span>'
+        f'<span class="cal-e">{_html_escape(e.get("event",""))}</span></div>'
         for e in (events or []))
     cal_html = cal or '<div class="mut" style="font-size:13px">앞으로 45일 내 예정된 이벤트가 없습니다.</div>'
 
@@ -839,10 +839,10 @@ def render_narrative(narr, summary, src=None, events=None):
 
     used = narr.get("sources_used") or []
     src_label = " · ".join(used) if used else "웹서치 보강"
-    cps = "".join(f'<li>{c}</li>' for c in narr.get("checkpoints", []))
+    cps = "".join(f'<li>{_html_escape(c)}</li>' for c in narr.get("checkpoints", []))
     news = "".join(
-        f'<div class="news-row"><div class="news-t">{n.get("title","")}</div>'
-        f'<div class="news-i">{n.get("impact","")}</div></div>'
+        f'<div class="news-row"><div class="news-t">{_html_escape(n.get("title",""))}</div>'
+        f'<div class="news-i">{_html_escape(n.get("impact",""))}</div></div>'
         for n in narr.get("news", []))
     news_html = news or '<div class="mut" style="font-size:13px">오늘 원천 콘텐츠에 특별히 언급된 뉴스가 없습니다.</div>'
 
@@ -874,6 +874,15 @@ def render_narrative(narr, summary, src=None, events=None):
     </section>'''
 
 
+def _html_escape(s):
+    """총평(AI가 제3자 블로그·유튜브 원문을 반영해 생성)과 소스 목록 제목은
+    외부 콘텐츠의 영향을 받는 값이라, 그대로 삽입하면 저장형 XSS로 이어질 수
+    있다 — 추적 중인 소스 계정이 침해되거나 원문에 우연히 '<' 등이 섞여도
+    안전하도록 항상 이스케이프해서 넣는다(속성값에도 쓰이므로 따옴표도 처리)."""
+    return (str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            .replace('"', "&quot;").replace("'", "&#39;"))
+
+
 def _paragraphs(text):
     """긴 텍스트를 \\n 기준으로 <p> 단락으로 변환(길이 제한 없이 전문 표시).
     마지막 단락은 결론 문단으로 보고 구분선을 넣어 시각적으로 분리한다."""
@@ -881,9 +890,9 @@ def _paragraphs(text):
         return "<p></p>"
     parts = [p.strip() for p in text.split("\n") if p.strip()]
     if not parts:
-        return f"<p>{text}</p>"
-    html = "".join(f"<p>{p}</p>" for p in parts[:-1])
-    html += f'<p class="ov-concl">{parts[-1]}</p>'
+        return f"<p>{_html_escape(text)}</p>"
+    html = "".join(f"<p>{_html_escape(p)}</p>" for p in parts[:-1])
+    html += f'<p class="ov-concl">{_html_escape(parts[-1])}</p>'
     return html
 
 
@@ -897,28 +906,30 @@ def render_source_list(src_list):
     for i, it in enumerate(src_list):
         summary = (it.get("summary") or "").strip()
         lines = [ln.strip() for ln in summary.split("\n") if ln.strip()]
+        # source/title/date는 추적 중인 블로그·유튜브 원문 제목 등 제3자 콘텐츠라
+        # 이스케이프 없이 삽입하면 저장형 XSS로 이어질 수 있다 — 항상 이스케이프.
         meta = f'''<div class="srcl-meta">
-            <span class="srcl-badge">{it["source"]}</span>
-            <span class="srcl-date">{it["date"]}</span>
+            <span class="srcl-badge">{_html_escape(it["source"])}</span>
+            <span class="srcl-date">{_html_escape(it["date"])}</span>
           </div>
-          <div class="srcl-title">{it["title"]}</div>'''
+          <div class="srcl-title">{_html_escape(it["title"])}</div>'''
         if not lines:
             # 요약이 아직 없는 항목은 "준비 중" 문구 없이 제목·링크만 간결하게 —
             # 문구 유무에 따라 행 높이가 들쑥날쑥해지는 것을 방지한다.
             row_htmls.append(f'''<div class="srcl-row">
               {meta}
-              <div class="srcl-actions"><a class="srcl-link" href="{it["url"]}" target="_blank" rel="noopener">원문 보기 ↗</a></div>
+              <div class="srcl-actions"><a class="srcl-link" href="{_html_escape(it["url"])}" target="_blank" rel="noopener">원문 보기 ↗</a></div>
             </div>''')
             continue
         # 차지하는 공간을 줄이기 위해 요약은 기본적으로 전부 접어두고 제목만
         # 보여준다("펼치기"를 눌러야 전체 내용이 펼쳐짐).
-        all_html = "".join(f"<p>{ln}</p>" for ln in lines)
+        all_html = "".join(f"<p>{_html_escape(ln)}</p>" for ln in lines)
         row_htmls.append(f'''<div class="srcl-row">
           {meta}
           <div class="srcl-summary-full" id="srcl-full-{i}" style="display:none">{all_html}</div>
           <div class="srcl-actions has-toggle">
             <button type="button" class="srcl-toggle" onclick="srclToggle(this,{i})">펼치기 ▾</button>
-            <a class="srcl-link" href="{it["url"]}" target="_blank" rel="noopener">원문 보기 ↗</a>
+            <a class="srcl-link" href="{_html_escape(it["url"])}" target="_blank" rel="noopener">원문 보기 ↗</a>
           </div>
         </div>''')
 
