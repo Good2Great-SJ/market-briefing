@@ -47,15 +47,25 @@ def _already_done(session, date_str):
     # 마커가 유실돼 이미 발행된 세션을 또 재발행·재발송할 수 있다. docs/manifest.json은
     # 항상 함께 커밋되는 실제 발행 기록이므로 이걸로도 한 번 더 확인한다.
     #
-    # 주의: manifest 항목의 "date"는 리포트의 ref_date(예: us 세션은 보통 전날)이지
-    # "오늘"이 아니다 — r["date"] == date_str로 비교하면 us 세션에서는 거의 항상
-    # 어긋나 이 안전장치가 사실상 무력화된다(위 실사고의 근본 원인). 대신 실제
-    # "오늘 이미 만들어졌는가"를 뜻하는 generated_at의 날짜 부분으로 비교한다.
+    # 주의 1: manifest 항목의 "date"는 리포트의 ref_date(예: us 세션은 보통 전날)이지
+    # "오늘"이 아니다 — r["date"] == date_str로만 비교하면 us 세션에서는 거의 항상
+    # 어긋나 이 안전장치가 사실상 무력화된다(2026-07-25 us 실사고 원인). us는
+    # ref_date가 today-1인 경우가 흔하므로 그 후보도 함께 확인한다.
+    #
+    # 주의 2: generated_at은 자막 지연 등으로 조용히 재발행(recheck_pending_updates)될
+    # 때마다 갱신되는 "마지막 손댄 시각"이라, 자정을 넘겨 갱신되면 그 날짜가 우연히
+    # 오늘 date_str과 같아져 어제 리포트를 "오늘 이미 발행됨"으로 오판할 수 있다
+    # (2026-07-28 kr 세션 실사고 — 어젯밤 01:52에 조용히 갱신된 것 때문에 오늘 하루
+    # 종일 발행이 막혔음). 그래서 generated_at이 아니라 안정적인 date 필드로만 비교한다.
     try:
         manifest_path = os.path.join(os.path.dirname(__file__), "docs", "manifest.json")
         with open(manifest_path, encoding="utf-8") as f:
             manifest = json.load(f)
-        return any(r.get("session") == session and (r.get("generated_at") or "")[:10] == date_str
+        candidates = {date_str}
+        if session == "us":
+            d = datetime.date.fromisoformat(date_str) - datetime.timedelta(days=1)
+            candidates.add(d.isoformat())
+        return any(r.get("session") == session and (r.get("date") or "")[:10] in candidates
                    for r in manifest)
     except Exception:
         return False
