@@ -1,10 +1,11 @@
 name: AI & Technology Briefing
 
 on:
-  schedule:
-    # GitHub cron uses UTC. These are 06:30 and 16:00 Asia/Singapore (UTC+8).
-    - cron: "30 22 * * *"
-    - cron: "0 8 * * *"
+  # 자동 스케줄 중지(요청에 따라) — 필요시 아래 두 줄의 주석을 해제하면 재개 가능.
+  # schedule:
+  #   # GitHub cron uses UTC. These are 06:30 and 16:00 Asia/Singapore (UTC+8).
+  #   - cron: "30 22 * * *"
+  #   - cron: "0 8 * * *"
   workflow_dispatch:
     inputs:
       edition:
