@@ -86,6 +86,10 @@ def _earnings_events(today, days_ahead):
             df = yf.Ticker(ticker).get_earnings_dates(limit=4)
             if df is None or df.empty:
                 continue
+            # yfinance가 같은 실적일을 "추정치" 행과 "확정치" 행 두 개로 중복
+            # 반환하는 경우가 실제로 있다(예: 발표 당일, 같은 timestamp가 두 번) —
+            # 종목당 같은 날짜는 한 번만 쓴다.
+            df = df[~df.index.duplicated(keep="first")]
             for ts in df.index:
                 if is_foreign and ts.tzinfo is not None:
                     kst_ts = ts.tz_convert(KST)
@@ -129,4 +133,14 @@ def get_upcoming_events(today=None, days_ahead=45):
         print("  ! 실적 발표일 조회 실패:", repr(e)[:150])
 
     events.sort(key=lambda x: x[0])
-    return [{"date": d.isoformat(), "event": label} for d, label in events]
+    # (날짜, 라벨) 완전 동일 항목이 섞여 들어오는 걸 최종적으로 한 번 더 걸러낸다
+    # (개별 소스의 중복 방지 로직을 우회하는 경우에 대비한 안전망).
+    seen = set()
+    deduped = []
+    for d, label in events:
+        key = (d, label)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append((d, label))
+    return [{"date": d.isoformat(), "event": label} for d, label in deduped]
