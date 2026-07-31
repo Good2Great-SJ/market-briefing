@@ -1,10 +1,17 @@
 [
   {
+    "session": "kr",
+    "date": "2026-07-31",
+    "theme": "coinbase",
+    "path": "reports/kr_coinbase_20260731.html",
+    "generated_at": "2026-07-31T18:03:54+09:00"
+  },
+  {
     "session": "us",
     "date": "2026-07-30",
     "theme": "coinbase",
     "path": "reports/us_coinbase_20260730.html",
-    "generated_at": "2026-07-31T08:17:29+09:00"
+    "generated_at": "2026-07-31T18:05:43+09:00"
   },
   {
     "session": "kr",
