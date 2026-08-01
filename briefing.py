@@ -658,7 +658,7 @@ def render(session, ref, now, yf_data, kr_idx, kr_stk, money,
 
     # ── 총평 섹션 ──
     narr_html = render_narrative(narr, summary, src, events)
-    source_list_html = render_source_list(src_list)
+    source_list_html = render_source_list(src_list, session, ref)
 
     # ── 매크로 (장단기차 카드 포함) ──
     macro_cards = []
@@ -899,7 +899,7 @@ def _paragraphs(text):
 SRCL_VISIBLE_COUNT = 8  # 기본으로 보여줄 항목 수, 나머지는 "더보기"로 펼침
 
 
-def render_source_list(src_list):
+def render_source_list(src_list, session=None, ref=None):
     if not src_list:
         return ""
     row_htmls = []
@@ -958,11 +958,17 @@ def render_source_list(src_list):
       btn.textContent = showing ? btn.dataset.moreLabel : "접기 ▴";
     }
     </script>'''
+    banner_campaign = f"sources_banner_{session}_{ref}" if session and ref else "sources_banner"
+    banner_html = f'''<div class="srcl-banner">
+      <a href="{BLOG_HOME}/?utm_source=market_briefing&amp;utm_medium=banner&amp;utm_campaign={banner_campaign}" target="_top">
+        <img src="assets/promo/doleman-sources-banner.png" alt="doleman - 뉴스 너머의 시장, 진짜 흐름을 읽다" loading="lazy">
+      </a>
+    </div>'''
     return f'''<section class="brief" id="sources">
       <div class="eyebrow"><span class="badge">Sources</span><span class="sub">수집된 원문 글·영상</span></div>
       <h2>주요 블로그 및 영상</h2>
       <div class="srcl-card">{rows}</div>
-    </section>{script}'''
+    </section>{banner_html}{script}'''
 
 
 def render_fed_odds(fed_list):
@@ -1194,6 +1200,11 @@ padding:6px 14px;font-size:12px;font-weight:600;color:var(--ink);cursor:pointer;
 .srcl-more-btn{width:100%;background:var(--strong);border:1px solid var(--hair);border-radius:12px;
 padding:10px 14px;font-size:12.5px;font-weight:700;color:var(--ink);cursor:pointer;}
 .srcl-more-btn:hover{background:var(--hair);}
+.srcl-banner{max-width:520px;margin:16px auto 0;}
+.srcl-banner a{display:block;border-radius:16px;overflow:hidden;line-height:0;
+box-shadow:0 12px 30px rgba(22,82,240,.07);transition:box-shadow .15s ease,transform .15s ease;}
+.srcl-banner a:hover{box-shadow:0 16px 36px rgba(22,82,240,.12);transform:translateY(-1px);}
+.srcl-banner img{display:block;width:100%;height:auto;}
 h2{font-size:29px;font-weight:400;letter-spacing:-.6px;margin:0 0 16px;color:var(--ink);}
 
 /* 총평 */
