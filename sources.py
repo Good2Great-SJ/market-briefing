@@ -95,16 +95,30 @@ def _row_effective_date(row):
 
 
 _SIHWANG_PATTERN = re.compile(r"(\S+)시황")
+# "시황" 태그는 없지만 실제로는 증시와 무관하거나 특정 국가(중국) 전용 코너인
+# 제목 패턴. 실측 데이터에서 "중국시황"뿐 아니라 "차이나포커스"라는 이름으로도
+# 나가는 걸 확인해서(2026-07-31 실사례) 별도로 걸러낸다.
+_NON_MARKET_TITLE_PATTERN = re.compile(r"차이나\s*포커스")
+
+# 'OO시황' 같은 명시적 세션 태그를 항상 붙이는 소스. 이런 소스는 태그가 없는
+# 영상(게스트 인터뷰, 법률 상담, 책 소개 등 일반 콘텐츠)이 발행시각만 보고
+# 엉뚱하게 채택되는 사고를 막기 위해, 태그가 없으면 그냥 "매칭 안 됨"으로
+# 처리한다(발행시각 폴백을 쓰지 않는다). 태그 관행이 없는 소스(버터대디)만
+# 발행시각 폴백을 허용한다.
+_HOUR_FALLBACK_ELIGIBLE = {BUTTERDADDY_BLOG_ID}
 
 
 def _title_session_hint(title):
     """
     제목에 'OO시황' 태그가 있으면(증시각도기가 주로 사용) 그걸 최우선 판정 기준으로 쓴다.
-    '미국시황'→us, '한국시황'→kr, 그 외('중국시황' 등)는 두 세션 어디에도 해당하지
-    않는 별개 주제이므로 "other"로 명시적으로 제외한다(시간대 폴백으로 잘못 채택되는 것 방지).
+    '미국시황'→us, '한국시황'→kr, 그 외('중국시황', '차이나포커스' 등)는 두 세션
+    어디에도 해당하지 않는 별개 주제이므로 "other"로 명시적으로 제외한다
+    (시간대 폴백으로 잘못 채택되는 것 방지).
     """
     if not title:
         return None
+    if _NON_MARKET_TITLE_PATTERN.search(title):
+        return "other"
     m = _SIHWANG_PATTERN.search(title)
     if not m:
         return None
@@ -119,13 +133,18 @@ def _title_session_hint(title):
 def _matches_session(row, session):
     """
     어느 세션(미국장/한국장) 콘텐츠인지 판정.
-    1순위: 제목의 'OO시황' 태그. 2순위: 태그가 없으면 발행시각(KST 시간대)으로 판정(버터대디 등).
+    1순위: 제목의 'OO시황' 태그. 2순위: 태그가 없고 발행시각 폴백이 허용된
+    소스(버터대디)에 한해서만 발행시각(KST 시간대)으로 판정한다 — 증시각도기처럼
+    항상 태그를 붙이는 소스는 태그 없는 영상을 시간대만 보고 잘못 채택하지
+    않도록 폴백을 아예 쓰지 않는다.
     """
     hint = _title_session_hint(row["title"])
     if hint == "other":
         return False
     if hint is not None:
         return hint == session
+    if row.get("blog_id") not in _HOUR_FALLBACK_ELIGIBLE:
+        return False
     lo, hi = _HOUR_RANGE[session]
     hour = row["_published_dt"].astimezone(KST).hour
     return lo <= hour <= hi
@@ -169,6 +188,17 @@ def _find_matching(blog_id, want_date, session):
     for item in candidates:
         if _matches_session(item, session):
             return item
+    # 버터대디는 보통 제목 날짜와 발행시각(KST)이 정확히 맞아떨어지지만(실측
+    # 확인), 가끔 발행이 늦어져 하루를 넘겨 올라오는 경우에 대한 안전망이다 —
+    # 발행시각 폴백이 허용된 소스에 한해, want_date+1로 제목이 달린 글도
+    # 발행시각으로 한 번 더 확인한다(정상적인 대부분의 경우 위 두 루프에서
+    # 이미 찾고 여기까진 오지 않는다).
+    if session == "kr" and blog_id in _HOUR_FALLBACK_ELIGIBLE:
+        next_day = want_date + datetime.timedelta(days=1)
+        later = [c for c in _fetch_candidates(blog_id) if _row_effective_date(c) == next_day]
+        for item in later:
+            if _matches_session(item, session):
+                return item
     return None
 
 
