@@ -301,6 +301,7 @@ loadManifest(false).then(() => { if (manifest.length) selectInitial(); });
   function openModal(){
     closing = false;
     modal.hidden = false;
+    modal.style.pointerEvents = "";
     box.style.transition = ""; box.style.transform = ""; box.style.opacity = "";
     video.muted = true;
     soundBtn.textContent = "🔇 소리 켜기";
@@ -313,6 +314,14 @@ loadManifest(false).then(() => { if (manifest.length) selectInitial(); });
     if (closing) return;
     closing = true;
     video.pause();
+    // #promoModal은 position:fixed;inset:0로 화면 전체를 덮고 있어, 닫히는
+    // 0.8초 애니메이션 동안에도(디졸브가 끝나 hidden=true가 되기 전까지) 계속
+    // 터치/스크롤/클릭을 가로챈다 — 특히 모바일 사파리는 이런 전체화면 fixed
+    // 요소가 사라진 직후 스크롤 제스처 인식이 꼬여 새로고침 전까진 아래
+    // 화면이 스크롤 안 되는 문제가 실제로 있었다. 애니메이션 시작과 동시에
+    // pointer-events를 꺼서 아래 화면이 바로 터치를 받도록 한다(어차피 이
+    // 시점부턴 사용자가 팝업과 상호작용할 이유가 없음).
+    modal.style.pointerEvents = "none";
     const target = banner.querySelector(".promo-cta") || banner;
     const t = target.getBoundingClientRect();
     const b = box.getBoundingClientRect();
