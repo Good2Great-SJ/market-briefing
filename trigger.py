@@ -200,22 +200,27 @@ def check_and_run(now_sgt=None, dry_run=False):
         has_source = sources.has_any(src)
         is_hardstop = t >= hardstop
 
-        if not (has_source or is_hardstop):
-            print(f"[{session}] 대기 중 — 원천 콘텐츠 아직 없음 (윈도우 {start}~{hardstop}, 현재 {t})")
+        if not has_source:
+            # 하드스톱을 지났어도 버터대디/증시각도기 총평 원문이 아직 없으면
+            # 규칙 기반(또는 웹서치) 대체 총평으로 발행하지 않고 계속 대기한다
+            # — 대체 총평은 인사이트가 없어 가치가 낮다는 피드백. 휴장일이라
+            # 애초에 원문이 안 올라올 상황일 때만 예외적으로 건너뛴다.
+            if is_hardstop:
+                import calendars
+                market_date = today_kst if session == "kr" else today_kst - datetime.timedelta(days=1)
+                is_holiday = (calendars.is_kr_market_holiday(market_date) if session == "kr"
+                              else calendars.is_us_market_holiday(market_date))
+                if is_holiday:
+                    print(f"[{session}] 건너뜀 — {market_date} 휴장일(주말/공휴일)이라 소스도 없음, 발송 생략")
+                    if not dry_run:
+                        _mark_done(session, date_str, "holiday_skip")
+                    continue
+                print(f"[{session}] 대기 중 — 하드스톱을 지났지만 원문이 아직 없어 계속 대기 (현재 {t})")
+            else:
+                print(f"[{session}] 대기 중 — 원천 콘텐츠 아직 없음 (윈도우 {start}~{hardstop}, 현재 {t})")
             continue
 
-        if not has_source and is_hardstop:
-            import calendars
-            market_date = today_kst if session == "kr" else today_kst - datetime.timedelta(days=1)
-            is_holiday = (calendars.is_kr_market_holiday(market_date) if session == "kr"
-                          else calendars.is_us_market_holiday(market_date))
-            if is_holiday:
-                print(f"[{session}] 건너뜀 — {market_date} 휴장일(주말/공휴일)이라 소스도 없음, 발송 생략")
-                if not dry_run:
-                    _mark_done(session, date_str, "holiday_skip")
-                continue
-
-        reason = "source_ready" if has_source else "hardstop_fallback"
+        reason = "source_ready"
         print(f"[{session}] 트리거 발동 (사유: {reason}) — 브리핑 생성 시작")
         if not dry_run:
             import briefing
