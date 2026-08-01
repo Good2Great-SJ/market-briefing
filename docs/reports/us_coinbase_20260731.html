@@ -90,6 +90,12 @@ padding:6px 14px;font-size:12px;font-weight:600;color:var(--ink);cursor:pointer;
 .srcl-more-btn{width:100%;background:var(--strong);border:1px solid var(--hair);border-radius:12px;
 padding:10px 14px;font-size:12.5px;font-weight:700;color:var(--ink);cursor:pointer;}
 .srcl-more-btn:hover{background:var(--hair);}
+.srcl-banner{max-width:520px;margin:16px auto 0;}
+.srcl-banner a{display:block;border-radius:16px;overflow:hidden;line-height:0;
+box-shadow:0 12px 30px rgba(22,82,240,.07);transition:box-shadow .15s ease,transform .15s ease;}
+.srcl-banner a:hover{box-shadow:0 16px 36px rgba(22,82,240,.12);transform:translateY(-1px);}
+.srcl-banner img{display:block;width:100%;height:auto;}
+
 h2{font-size:29px;font-weight:400;letter-spacing:-.6px;margin:0 0 16px;color:var(--ink);}
 
 /* 총평 */
@@ -566,7 +572,11 @@ footer{max-width:1120px;margin:56px auto 0;padding:24px;border-top:1px solid var
             <a class="srcl-link" href="https://blog.naver.com/ranto28/224362387594?fromRss=true&amp;trackingCode=rss" target="_blank" rel="noopener">원문 보기 ↗</a>
           </div>
         </div></div><div class="srcl-more-row"><button type="button" class="srcl-more-btn" data-more-label="더보기 (20개 더) ▾" onclick="srclMoreToggle(this)">더보기 (20개 더) ▾</button></div></div>
-    </section><script>
+    </section><div class="srcl-banner">
+      <a href="https://doleman.tistory.com/?utm_source=market_briefing&amp;utm_medium=banner&amp;utm_campaign=sources_banner_us_2026-07-31" target="_top">
+        <img src="../assets/promo/doleman-sources-banner.png" alt="doleman - 뉴스 너머의 시장, 진짜 흐름을 읽다" loading="lazy">
+      </a>
+    </div><script>
     function srclToggle(btn, idx){
       var full = document.getElementById("srcl-full-" + idx);
       var showing = full.style.display !== "none";
