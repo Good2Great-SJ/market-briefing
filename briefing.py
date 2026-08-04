@@ -961,7 +961,7 @@ def render_source_list(src_list, session=None, ref=None):
     banner_campaign = f"sources_banner_{session}_{ref}" if session and ref else "sources_banner"
     banner_html = f'''<div class="srcl-banner">
       <a href="{BLOG_HOME}/?utm_source=market_briefing&amp;utm_medium=banner&amp;utm_campaign={banner_campaign}" target="_top">
-        <img src="assets/promo/doleman-sources-banner.png" alt="doleman - 뉴스 너머의 시장, 진짜 흐름을 읽다" loading="lazy">
+        <img src="https://good2great-sj.github.io/market-briefing/assets/promo/doleman-sources-banner.png" alt="doleman - 뉴스 너머의 시장, 진짜 흐름을 읽다" loading="lazy">
       </a>
     </div>'''
     return f'''<section class="brief" id="sources">
