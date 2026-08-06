@@ -85,6 +85,37 @@ def _email_already_sent(session, date_str):
     return os.path.exists(_email_marker_path(session, date_str))
 
 
+def _already_published_upstream(session, date_str):
+    """이메일 발송 직전, 원격 최신 상태로 한 번 더 "이미 발행됐는지" 확인한다.
+
+    GitHub 자체 schedule과 cron-job.org의 독립적인 workflow_dispatch가 거의
+    동시에(수십~수백 초 간격) 실행되면, 둘 다 이 로컬 체크아웃 시점 기준으로는
+    "아직 발행 안 됨"을 보고 각자 빌드·발송을 진행해버릴 수 있다(concurrency 잠금이
+    이 정도로 촘촘한 경합까지는 못 막았던 2026-08-06 KR 세션 중복 발송 실사고).
+    로컬 체크아웃은 이 작업 시작 시점의 스냅샷이라 그 사이 다른 실행이 먼저
+    커밋·푸시했어도 반영되지 않으므로, 발송 직전에 origin의 최신 manifest.json을
+    직접 확인해 이미 발행됐으면 중복 이메일을 보내지 않는다. 이 확인 자체가
+    실패해도(네트워크 등) 기존 동작을 막지 않도록 조용히 무시하고 진행한다."""
+    import subprocess
+    try:
+        repo_dir = os.path.dirname(os.path.abspath(__file__))
+        subprocess.run(["git", "fetch", "origin", "main", "-q"],
+                        cwd=repo_dir, timeout=30, check=True)
+        proc = subprocess.run(["git", "show", "origin/main:docs/manifest.json"],
+                               cwd=repo_dir, timeout=30, check=True,
+                               capture_output=True, text=True)
+        manifest = json.loads(proc.stdout)
+        candidates = {date_str}
+        if session == "us":
+            d = datetime.date.fromisoformat(date_str) - datetime.timedelta(days=1)
+            candidates.add(d.isoformat())
+        return any(r.get("session") == session and (r.get("date") or "")[:10] in candidates
+                   for r in manifest)
+    except Exception as e:
+        print(f"  ! 원격 재확인 실패(무시하고 진행): {repr(e)[:200]}")
+        return False
+
+
 def _mark_email_sent(session, date_str):
     os.makedirs(MARKER_DIR, exist_ok=True)
     with open(_email_marker_path(session, date_str), "w", encoding="utf-8") as f:
@@ -231,7 +262,13 @@ def check_and_run(now_sgt=None, dry_run=False):
             # 찾아버리는 문제가 있었다 — 시장 데이터는 직전 영업일 것을 그대로
             # 쓰되, 총평/블로그·영상/AI-Tech는 항상 오늘 날짜 기준 최신으로 맞춘다.
             result = briefing.build(session=session, theme="coinbase", make_pdf=False,
-                                     source_date=today_kst)
+                                     source_date=today_kst, require_narrative=True)
+            if result.get("skipped") == "narrative_unavailable":
+                # AI 총평 생성이 일시 실패한 경우 — 규칙 기반 대체로 발행하는 대신
+                # (인사이트 없는 대체 총평은 가치가 낮다는 피드백) 마커를 남기지
+                # 않고 다음 15분 주기에 다시 시도한다.
+                print(f"[{session}] 대기 중 — 총평 생성 일시 실패, 다음 주기에 재시도")
+                continue
             _mark_done(session, date_str, reason)
             if result.get("skipped"):
                 # 예: 월요일 장전 리포트인데 오늘이 한국 증시 휴장일 — 열릴 장이
@@ -240,6 +277,11 @@ def check_and_run(now_sgt=None, dry_run=False):
                 continue
             _, fn, pdf, report_url, viewer_url = result["outputs"][0]
             fired.append((session, reason, fn))
+            if _already_published_upstream(session, date_str):
+                # 이 실행이 빌드하는 동안 다른(거의 동시에 시작된) 트리거 실행이
+                # 먼저 커밋·발송을 끝냈다 — 같은 리포트를 또 보내지 않는다.
+                print(f"[{session}] 이메일 발송 생략 — 동시 실행된 다른 트리거가 이미 발행·발송함")
+                continue
             if _send_report_email(result, viewer_url, session=session, date_str=date_str):
                 _mark_email_sent(session, date_str)
                 payload = _email_payload_path(session, date_str)
