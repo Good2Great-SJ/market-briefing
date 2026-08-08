@@ -282,3 +282,46 @@ def fed_rate_odds(max_meetings=4):
             source_url=f"https://polymarket.com/event/{ev.get('slug','')}",
         ))
     return meetings or None
+
+
+def fetch_fear_greed():
+    """
+    CNN Fear & Greed Index(미국 증시 투자심리 지표) — CNN이 공식 API를 공개하지
+    않아 그래픽 페이지가 실제로 호출하는 비공식 데이터 엔드포인트를 그대로 쓴다
+    (증권가에서 널리 쓰이는 방식이지만, CNN 쪽에서 언제든 형식을 바꾸거나 막을
+    수 있다 — 실패 시 조용히 None을 반환해 리포트에서 해당 섹션만 생략된다).
+    인증 불필요. 현재값 + 최근 1년치 일별 히스토리를 함께 반환한다.
+    """
+    import requests
+    # CNN 엣지(추정: Akamai)가 최소 User-Agent/Referer만 보낸 요청은 418로 차단한다
+    # (curl은 통과, requests 기본 헤더는 차단 — 봇 핑거프린팅으로 보임). 실제
+    # 브라우저가 함께 보내는 헤더까지 갖춰야 통과한다(2026-08-08 실측 확인).
+    h = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                       "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://edition.cnn.com/markets/fear-and-greed",
+        "Origin": "https://edition.cnn.com",
+        "sec-ch-ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"Windows"',
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-site",
+    }
+    try:
+        r = requests.get("https://production.dataviz.cnn.io/index/fearandgreed/graphdata",
+                          headers=h, timeout=15)
+        r.raise_for_status()
+        d = r.json()
+        fg = d["fear_and_greed"]
+        history = [(pt["x"], pt["y"]) for pt in d["fear_and_greed_historical"]["data"]]
+    except Exception:
+        return None
+    return dict(
+        score=fg["score"], rating=fg["rating"],
+        prev_close=fg.get("previous_close"), prev_week=fg.get("previous_1_week"),
+        prev_month=fg.get("previous_1_month"), prev_year=fg.get("previous_1_year"),
+        history=history,
+    )

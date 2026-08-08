@@ -188,6 +188,41 @@ def chart_b64(df, name, n=130):
     return base64.b64encode(buf.getvalue()).decode()
 
 
+_FNG_ZONES = [
+    (0, 25, "#dc2626"), (25, 45, "#f97316"), (45, 55, "#ca8a04"),
+    (55, 75, "#65a30d"), (75, 100, "#16a34a"),
+]
+
+
+def fear_greed_chart_b64(history, n_days=180):
+    """CNN Fear & Greed Index 최근 n_days일 추이 라인차트(구간별 배경색 포함)."""
+    pts = sorted(history, key=lambda p: p[0])[-n_days:]
+    if len(pts) < 2:
+        return None
+    xs = [datetime.datetime.fromtimestamp(p[0] / 1000, tz=datetime.timezone.utc) for p in pts]
+    ys = [p[1] for p in pts]
+
+    fig, ax = plt.subplots(figsize=(9.6, 2.3), dpi=115)
+    fig.patch.set_facecolor("#fff"); ax.set_facecolor("#fff")
+    for lo, hi, col in _FNG_ZONES:
+        ax.axhspan(lo, hi, color=col, alpha=.08, zorder=1)
+    ax.plot(xs, ys, color="#0a0b0d", lw=1.3, zorder=3)
+    ax.scatter([xs[-1]], [ys[-1]], color="#0052ff", s=22, zorder=4)
+    ax.set_ylim(0, 100)
+    ax.xaxis.set_major_locator(mdates.MonthLocator(interval=1))
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%m월"))
+    ax.grid(True, axis="y", alpha=1, lw=.7, color="#eef0f3")
+    ax.tick_params(labelsize=7, colors="#7c828a", length=0)
+    ax.set_yticks([0, 25, 45, 55, 75, 100])
+    for s in ("top", "right", "left"):
+        ax.spines[s].set_visible(False)
+    ax.spines["bottom"].set_color("#dee1e6")
+    fig.tight_layout(pad=.4)
+    buf = io.BytesIO(); fig.savefig(buf, format="png", facecolor="#fff")
+    plt.close(fig)
+    return base64.b64encode(buf.getvalue()).decode()
+
+
 # ══════════════════════════════════════════════════════════════
 # 4. HTML 헬퍼
 # ══════════════════════════════════════════════════════════════
@@ -278,6 +313,7 @@ def section(key, eyebrow, title, sub, inner):
 
 _NAV_LABELS = {
     "narr": "총평", "sources": "소스", "macro": "매크로", "fed": "Fed",
+    "fear_greed": "공포·탐욕",
     "us_idx": "미국지수", "global": "글로벌", "semi": "반도체", "sectors": "섹터",
     "rs": "RS랭킹", "m7": "M7·AI", "chart_us": "차트(US)",
     "kr": "한국시장", "chart_kr": "차트(KR)",
@@ -381,6 +417,12 @@ def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None,
     except Exception as e:
         print("  ! 실패:", e); fed_odds = None
 
+    print("· 공포·탐욕 지수 (CNN)…")
+    try:
+        fear_greed = analytics.fetch_fear_greed()
+    except Exception as e:
+        print("  ! 실패:", e); fear_greed = None
+
     # 장단기 금리차
     spread = np.nan
     if U.YIELD_LONG in yf_data and U.YIELD_SHORT in yf_data:
@@ -465,6 +507,8 @@ def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None,
     kr_all = {**kr_idx, **kr_stk}
     charts_kr = [(nm, chart_b64(kr_all[tk], nm))
                  for tk, nm in U.CHART_TARGETS_KR if tk in kr_all]
+    fear_greed_chart = (fear_greed_chart_b64(fear_greed["history"])
+                         if fear_greed and fear_greed.get("history") else None)
 
     # 거래일 공백 리포트는 "미국 증시 마감"이 아니라 그날 날짜의 장전 리포트로
     # 제목·아카이브 날짜를 바꾼다(시장 데이터 자체는 ref_str/직전 개장일 그대로).
@@ -527,7 +571,8 @@ def build(session="auto", theme="coinbase", make_pdf=True, historical_date=None,
     for th in theme_list:
         html = render(session, ref_str, now_kst, yf_data, kr_idx, kr_stk, money,
                       charts_us, charts_kr, summary, mc, breadth, flows, narr, th, rs, src, credit_interp,
-                      fed_odds, src_list, gap_info, upcoming_events)
+                      fed_odds, src_list, gap_info, upcoming_events,
+                      fear_greed, fear_greed_chart)
         base = f"out/briefing_{session}_{th}_{archive_key.replace('-','')}"
         fn = base + ".html"
         with open(fn, "w", encoding="utf-8") as f:
@@ -630,7 +675,7 @@ def build_digest(session, yf_data, kr_idx, mc, money, summary, breadth):
 def render(session, ref, now, yf_data, kr_idx, kr_stk, money,
            charts_us, charts_kr, summary, mc, breadth, flows, narr, theme="coinbase", rs=None, src=None,
            credit_interp=None, fed_odds=None, src_list=None, gap_info=None,
-           events=None):
+           events=None, fear_greed=None, fear_greed_chart=None):
     css = themes.get_css(theme, CSS)
     kr_all = {**kr_idx, **kr_stk}
     if gap_info:
@@ -719,6 +764,7 @@ def render(session, ref, now, yf_data, kr_idx, kr_stk, money,
     S = {
         "macro":   section("macro", "Macro", "매크로 대시보드", "금리 · 유가 · 환율 · 변동성 · 장단기차", macro_html),
         "fed":     section("fed", "Fed Watch", "연준 금리 결정 확률", "Polymarket 예측시장 실시간 오즈", render_fed_odds(fed_odds)),
+        "fear_greed": section("fear_greed", "Sentiment", "공포·탐욕 지수", "CNN Fear &amp; Greed Index · 최근 추이", render_fear_greed(fear_greed, fear_greed_chart)),
         "us_idx":  section("us_idx", "US Index", "미국 4대 지수", "지수 위치 & 이평선 배열", scan_table(U.US_INDICES, yf_data, compute)),
         "global":  section("global", "Global", "글로벌 지수", "유로존 · 신흥국 · 중국 · 한국 · 일본 · 대만", scan_table(U.GLOBAL, yf_data, compute)),
         "semi":    section("semi", "Semiconductor", "반도체", "시장의 중심 섹터", scan_table(U.SEMI, yf_data, compute)),
@@ -730,9 +776,9 @@ def render(session, ref, now, yf_data, kr_idx, kr_stk, money,
         "chart_kr": section("chart_kr", "Charts · KR", "주요 차트 (한국)", "종가 + MA10 / 50 / 200", chart_grid(charts_kr)),
     }
     if session == "us":
-        order = ["macro", "fed", "us_idx", "global", "semi", "sectors", "rs", "m7", "chart_us", "kr", "chart_kr"]
+        order = ["macro", "fed", "fear_greed", "us_idx", "global", "semi", "sectors", "rs", "m7", "chart_us", "kr", "chart_kr"]
     else:
-        order = ["kr", "chart_kr", "macro", "fed", "us_idx", "semi", "sectors", "rs", "m7", "global", "chart_us"]
+        order = ["kr", "chart_kr", "macro", "fed", "fear_greed", "us_idx", "semi", "sectors", "rs", "m7", "global", "chart_us"]
     body_sections = "".join(S[k] for k in order)
     nav_keys = ["narr"] + (["sources"] if source_list_html else []) + [k for k in order if S[k]]
     nav_html = render_nav(nav_keys)
@@ -1018,6 +1064,52 @@ def render_fed_odds(fed_list):
     return f'<div class="fed-card">{tabs_html}{panels}</div>{script}'
 
 
+_FNG_RATING_KR = {
+    "extreme fear": "극단적 공포", "fear": "공포", "neutral": "중립",
+    "greed": "탐욕", "extreme greed": "극단적 탐욕",
+}
+
+
+def render_fear_greed(fg, chart_img):
+    if not fg:
+        return '<div class="fed-card mut" style="font-size:13px">공포·탐욕 지수 데이터를 가져오지 못했습니다.</div>'
+    score = fg["score"]
+    rating_kr = _FNG_RATING_KR.get(fg["rating"], fg["rating"])
+
+    def delta_cell(label, val):
+        if val is None or val != val:
+            return f'<div class="fng-delta"><div class="fdl">{label}</div><div class="fdv mut">–</div></div>'
+        diff = score - val
+        cls = "up" if diff >= 0 else "dn"
+        return (f'<div class="fng-delta"><div class="fdl">{label}</div>'
+                f'<div class="fdv num">{val:.0f}</div>'
+                f'<div class="fdc num {cls}">{"+" if diff>=0 else ""}{diff:.0f}</div></div>')
+
+    deltas = "".join([
+        delta_cell("전일", fg.get("prev_close")),
+        delta_cell("1주 전", fg.get("prev_week")),
+        delta_cell("1개월 전", fg.get("prev_month")),
+        delta_cell("1년 전", fg.get("prev_year")),
+    ])
+    chart_html = (f'<div class="fng-chart"><img src="data:image/png;base64,{chart_img}" alt="Fear &amp; Greed Index 추이"/></div>'
+                  if chart_img else "")
+    return f'''<div class="fed-card">
+      <div class="fng-top">
+        <div class="fng-score-block">
+          <div class="fng-score num">{score:.0f}</div>
+          <div class="fng-rating">{rating_kr}</div>
+        </div>
+        <div class="fng-gauge-wrap">
+          <div class="fng-gauge"><div class="fng-marker" style="left:{score:.0f}%"></div></div>
+          <div class="fng-scale"><span>극단적 공포</span><span>공포</span><span>중립</span><span>탐욕</span><span>극단적 탐욕</span></div>
+        </div>
+      </div>
+      <div class="fng-deltas">{deltas}</div>
+      {chart_html}
+      <div class="mut" style="font-size:11px;margin-top:10px">출처: CNN Business Fear &amp; Greed Index(비공식 데이터) · 시장 모멘텀·변동성(VIX)·풋콜비율·정크본드 수요 등 7개 지표 종합.</div>
+    </div>'''
+
+
 def render_mcap(mc):
     if "KOSPI" not in mc and "KOSDAQ" not in mc:
         return ""
@@ -1284,6 +1376,29 @@ border-radius:100px;padding:4px 12px;margin-bottom:10px;}
 .fed-tabs{display:flex;gap:8px;margin-bottom:16px;}
 .fed-tab{background:var(--strong);color:var(--body);border:none;border-radius:100px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;}
 .fed-tab-active{background:var(--primary);color:#fff;}
+
+.fng-top{display:flex;align-items:center;gap:24px;flex-wrap:wrap;}
+.fng-score-block{flex:0 0 auto;text-align:center;}
+.fng-score{font-size:40px;font-weight:800;letter-spacing:-.02em;color:var(--ink);line-height:1;}
+.fng-rating{margin-top:6px;font-size:13px;font-weight:600;color:var(--muted);}
+.fng-gauge-wrap{flex:1 1 260px;min-width:220px;}
+.fng-gauge{position:relative;height:10px;border-radius:100px;margin-top:6px;
+  background:linear-gradient(to right,#dc2626 0%,#dc2626 25%,#f97316 25%,#f97316 45%,#ca8a04 45%,#ca8a04 55%,#65a30d 55%,#65a30d 75%,#16a34a 75%,#16a34a 100%);}
+.fng-marker{position:absolute;top:-4px;width:4px;height:18px;background:var(--ink);border-radius:2px;
+  transform:translateX(-2px);box-shadow:0 0 0 2px var(--card);}
+.fng-scale{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:6px;}
+.fng-deltas{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:20px;}
+.fng-delta{background:var(--strong);border-radius:14px;padding:12px 14px;}
+.fdl{font-size:11.5px;color:var(--muted);}
+.fdv{font-size:18px;font-weight:700;color:var(--ink);margin-top:4px;}
+.fdc{font-size:11.5px;margin-top:2px;}
+.fng-chart{margin-top:18px;}
+.fng-chart img{width:100%;height:auto;display:block;border-radius:12px;}
+@media(max-width:640px){
+  .fng-deltas{grid-template-columns:repeat(2,1fr);}
+  .fng-scale span{display:none;}
+  .fng-scale span:first-child,.fng-scale span:last-child{display:inline;}
+}
 
 .table-card{background:var(--card);border:1px solid var(--hair);border-radius:20px;overflow-x:auto;margin-bottom:8px;}
 table.scan{width:100%;border-collapse:collapse;font-size:13.5px;}
