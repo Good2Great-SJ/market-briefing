@@ -784,21 +784,50 @@ def render(session, ref, now, yf_data, kr_idx, kr_stk, money,
     nav_html = render_nav(nav_keys)
 
     # ── 히어로 스탯 카드 ──
+    # us/kr 세션 상관없이 늘 같은 4장(美/글로벌 스캔 2장 + 고객예탁금·코스피 2장)을
+    # 보여주다 보니 "미국 증시 마감" 리포트에 한국 예탁금이, "한국 증시 마감"
+    # 리포트에 美/글로벌 스캔이 앞장서서 어느 시장 리포트인지 헷갈린다는 피드백
+    # (2026-08-08) — 세션별로 어울리는 카드 구성을 따로 둔다.
     b50 = f"{breadth['pct50']:.0f}%" if breadth else "–"
-    kospi_pos = f"{mc['KOSPI']['pct5']:.0f}%" if "KOSPI" in mc else "–"
-    # 이 카드는 세션(us/kr) 상관없이 항상 미국·글로벌 지수를 스캔한 숫자라
-    # "한국증시 마감" 리포트에서 특히 헷갈리기 쉬웠다 — 배지와 기준일을 명시.
     yf_ref = yf_data["^GSPC"].index[-1].strftime("%Y-%m-%d") if "^GSPC" in yf_data else "-"
-    hero_cards = f'''
+    yetak_card = f'''
+      <div class="scard"><div class="sl">고객예탁금 <span class="mut" style="font-weight:400">(기준 {m_date})</span></div>
+        <div class="sv num">{yetak}</div><div class="sc num">{yetak_c}</div></div>'''
+
+    if session == "us":
+        scan_card = f'''
       <div class="scard"><div class="sl">스캔 {breadth['n'] if breadth else summary['n_up']+summary['n_dn']}종목 상승 / 하락 <span class="badge" style="font-size:9.5px;padding:2px 8px;vertical-align:1px">美/글로벌</span></div>
         <div class="sv"><span class="up">{summary['n_up']}</span> <span class="sep">/</span> <span class="dn">{summary['n_dn']}</span></div>
-        <div class="sc mut">美 지수·반도체·섹터·M7·글로벌 지수 (기준 {yf_ref})</div></div>
+        <div class="sc mut">美 지수·반도체·섹터·M7·글로벌 지수 (기준 {yf_ref})</div></div>'''
+        breadth_card = f'''
       <div class="scard"><div class="sl">시장폭 · 50일선 상회 비율</div>
-        <div class="sv num">{b50}</div><div class="sc mut">200일선 상회 {f"{breadth['pct200']:.0f}%" if breadth else "–"}</div></div>
-      <div class="scard"><div class="sl">고객예탁금 <span class="mut" style="font-weight:400">(기준 {m_date})</span></div>
-        <div class="sv num">{yetak}</div><div class="sc num">{yetak_c}</div></div>
-      <div class="scard"><div class="sl">코스피 시총 · 5년내 위치</div>
-        <div class="sv num">{kospi_pos}</div><div class="sc mut">신용 {sinyong}</div></div>'''
+        <div class="sv num">{b50}</div><div class="sc mut">200일선 상회 {f"{breadth['pct200']:.0f}%" if breadth else "–"}</div></div>'''
+        vix_row = compute(yf_data["^VIX"]) if "^VIX" in yf_data else None
+        gspc_row = compute(yf_data["^GSPC"]) if "^GSPC" in yf_data else None
+        vix_card = f'''
+      <div class="scard"><div class="sl">VIX 변동성 지수</div>
+        <div class="sv num">{f"{vix_row['close']:.1f}" if vix_row else "–"}</div>
+        <div class="sc num">{f"{vix_row['chg']:+.1f}%" if vix_row else "–"}</div></div>'''
+        gspc_card = f'''
+      <div class="scard"><div class="sl">S&amp;P500 · 전고점 대비</div>
+        <div class="sv num">{f"{gspc_row['from_hi']:+.1f}%" if gspc_row else "–"}</div>
+        <div class="sc mut">이동평균 {gspc_row['arr'] if gspc_row else "–"}</div></div>'''
+        hero_cards = scan_card + breadth_card + vix_card + gspc_card
+    else:
+        kospi_row = compute(kr_idx["KS11"]) if "KS11" in kr_idx else None
+        kosdaq_row = compute(kr_idx["KQ11"]) if "KQ11" in kr_idx else None
+        kospi_idx_card = f'''
+      <div class="scard"><div class="sl">코스피 지수</div>
+        <div class="sv num">{fmt_price(kospi_row['close']) if kospi_row else "–"}</div>
+        <div class="sc num">{f"{kospi_row['chg']:+.2f}%" if kospi_row else "–"}</div></div>'''
+        kosdaq_idx_card = f'''
+      <div class="scard"><div class="sl">코스닥 지수</div>
+        <div class="sv num">{fmt_price(kosdaq_row['close']) if kosdaq_row else "–"}</div>
+        <div class="sc num">{f"{kosdaq_row['chg']:+.2f}%" if kosdaq_row else "–"}</div></div>'''
+        credit_ratio_card = f'''
+      <div class="scard"><div class="sl">신용잔고 비율 <span class="mut" style="font-weight:400">(기준 {m_date})</span></div>
+        <div class="sv num">{ratio_s}</div><div class="sc mut">신용융자잔고 {sinyong}</div></div>'''
+        hero_cards = kospi_idx_card + kosdaq_idx_card + yetak_card + credit_ratio_card
 
     return f"""<meta charset="utf-8">
 <title>{title} · {gap_info['display_date'] if gap_info else ref}</title>

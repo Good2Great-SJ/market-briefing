@@ -1,6 +1,6 @@
 {
-  "name": "Good To Great",
-  "short_name": "Good To Great",
+  "name": "G2G Dashboard",
+  "short_name": "G2G Dashboard",
   "description": "미국·한국 증시 마감 브리핑 아카이브",
   "start_url": "./",
   "scope": "./",

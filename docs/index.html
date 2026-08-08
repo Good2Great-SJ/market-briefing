@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Good To Great</title>
+<title>G2G Dashboard</title>
 
 <link rel="manifest" href="site.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
@@ -11,7 +11,7 @@
 <meta name="theme-color" content="#1652f0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Good To Great">
+<meta name="apple-mobile-web-app-title" content="G2G Dashboard">
 <meta name="mobile-web-app-capable" content="yes">
 
 <style>
@@ -41,6 +41,8 @@
   button{background:var(--primary);color:#fff;border:none;border-radius:10px;padding:9px 16px;font-size:13.5px;font-weight:600;cursor:pointer;white-space:nowrap;}
   button:active{opacity:.85;}
   button.ghost{background:var(--strong);color:var(--ink);}
+  button.subscribe-btn{background:#f97316;color:#fff;padding:8px 13px;font-size:12.5px;}
+  button.subscribe-btn:hover{background:#ea6a0c;}
   .blog-link{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:8px 13px;border:1px solid var(--hair);border-radius:10px;background:var(--strong);color:var(--primary);font-size:12.5px;font-weight:750;text-decoration:none;white-space:nowrap;}
   .blog-link:hover{border-color:var(--primary);}
   .status{font-size:12px;color:var(--muted);white-space:nowrap;}
@@ -94,6 +96,18 @@
   .frame-wrap{flex:1;min-height:0;display:flex;flex-direction:column;}
   iframe{flex:1;min-height:0;width:100%;border:none;display:block;background:var(--bg);}
   .empty{display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:14px;text-align:center;padding:20px;}
+
+  /* ── 이메일 구독 모달 ── */
+  #subscribeModal{position:fixed;inset:0;z-index:110;display:flex;align-items:center;justify-content:center;padding:20px;}
+  #subscribeModal[hidden]{display:none;}
+  .sub-backdrop{position:absolute;inset:0;background:rgba(4,8,22,.6);}
+  .sub-box{position:relative;width:min(420px,100%);max-height:88vh;overflow:auto;border-radius:16px;
+    background:var(--card);padding:30px 24px 24px;box-shadow:0 30px 90px rgba(0,0,0,.4);}
+  .sub-close{position:absolute;top:12px;right:12px;background:var(--strong);color:var(--ink);border:none;
+    border-radius:100px;width:30px;height:30px;font-size:14px;line-height:1;cursor:pointer;padding:0;}
+  #stb_subscribe .stb_form_title{font-size:16px;font-weight:800;color:var(--ink);margin:0 0 16px;}
+  #stb_subscribe .stb_form_set_label{color:var(--body);}
+  #stb_subscribe .stb_form_set_input{width:100%;box-sizing:border-box;}
   @media(max-width:720px){
     .topbar{gap:9px;padding:11px 12px;padding-top:calc(11px + env(safe-area-inset-top));}
     .brand-wrap{min-width:0;}
@@ -110,7 +124,8 @@
       <div class="brand">Good To Great</div>
       <div class="brand-sub">Market Intelligence</div>
     </div>
-    <a class="blog-link" href="https://doleman.tistory.com/?utm_source=market_briefing&amp;utm_medium=referral&amp;utm_campaign=viewer_header">오늘의 해설 ↗</a>
+    <a class="blog-link" href="https://doleman.tistory.com/?utm_source=market_briefing&amp;utm_medium=referral&amp;utm_campaign=viewer_header">블로그 가기 ↗</a>
+    <button class="subscribe-btn" id="subscribeBtn">이메일 구독</button>
     <select id="picker"><option>불러오는 중…</option></select>
     <button id="latestBtn" class="ghost">최신으로</button>
     <span class="status" id="status"></span>
@@ -142,6 +157,64 @@
   <div class="frame-wrap" id="frameWrap">
     <div class="empty">리포트를 불러오는 중입니다…</div>
   </div>
+
+  <!-- 이메일 구독(스티비) 모달 -->
+  <div id="subscribeModal" hidden>
+    <div class="sub-backdrop" id="subBackdrop"></div>
+    <div class="sub-box" id="subBox">
+      <button class="sub-close" id="subClose" type="button" aria-label="닫기">✕</button>
+      <link rel="stylesheet" href="https://resource.stibee.com/subscribe/stb_subscribe_form_style.css">
+      <div id="stb_subscribe">
+        <form action="https://stibee.com/api/v1.0/lists/XEsAq1447TNTwIfQ9yNhnX5L5ddjKQ==/public/subscribers" method="POST" target="_blank" accept-charset="utf-8" class="stb_form" name="stb_subscribe_form" id="stb_subscribe_form" data-lang="" novalidate>
+          <h1 class="stb_form_title">Good to Great Dashboard 구독하기</h1>
+          <fieldset class="stb_form_set">
+            <label for="stb_email" class="stb_form_set_label">
+              이메일 주소<span class="stb_asterisk">*</span>
+            </label>
+            <input type="text" class="stb_form_set_input" id="stb_email" name="email" required="required">
+            <div class="stb_form_msg_error" id="stb_email_error"></div>
+          </fieldset>
+          <div class="stb_form_policy">
+            <label>
+              <input type="checkbox" id="stb_policy" value="stb_policy_true">
+              <span>(필수)</span>
+              <button id="stb_form_modal_open" data-modal="stb_form_policy_modal" class="stb_form_modal_open_btn" type="button">개인정보 수집 및 이용</button>에 동의합니다.
+            </label>
+            <div class="stb_form_msg_error" id="stb_policy_error"></div>
+            <div class="stb_form_modal stb_form_policy_text blind" id="stb_form_policy_modal">
+              <div class="stb_form_modal_body">
+                <h1 class="stb_form_modal_title">개인정보 수집 및 이용</h1>
+                <div class="stb_form_modal_text">뉴스레터 발송을 위한 최소한의 개인정보를 수집하고 이용합니다.
+수집된 정보는 발송 외 다른 목적으로 이용되지 않으며, 서비스가 종료되거나 구독을 해지할 경우 즉시 파기됩니다.</div>
+                <div class="stb_form_modal_btn">
+                  <button id="stb_form_modal_close" class="stb_form_modal_close_btn" data-modal="stb_form_policy_modal" type="button">닫기</button>
+                </div>
+              </div>
+              <div class="stb_form_modal_bg" id="stb_form_modal_bg"></div>
+            </div>
+          </div>
+          <div class="stb_form_result" id="stb_form_result"></div>
+          <fieldset class="stb_form_set_submit">
+            <button type="submit" class="stb_form_submit_button" id="stb_form_submit_button" style="background-color: #FF6464; color: #ffffff;">구독하기</button>
+          </fieldset>
+        </form>
+      </div>
+      <script type="text/javascript" src="https://resource.stibee.com/subscribe/stb_subscribe_form.js"></script>
+    </div>
+  </div>
+  <script>
+    (function(){
+      const modal = document.getElementById("subscribeModal");
+      const openBtn = document.getElementById("subscribeBtn");
+      const closeBtn = document.getElementById("subClose");
+      const backdrop = document.getElementById("subBackdrop");
+      function open(){ modal.hidden = false; }
+      function close(){ modal.hidden = true; }
+      openBtn.addEventListener("click", open);
+      closeBtn.addEventListener("click", close);
+      backdrop.addEventListener("click", close);
+    })();
+  </script>
 
 <script>
 const params = new URLSearchParams(location.search);
