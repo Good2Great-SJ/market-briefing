@@ -238,9 +238,20 @@ def check_and_run(now_sgt=None, dry_run=False):
             # 애초에 원문이 안 올라올 상황일 때만 예외적으로 건너뛴다.
             if is_hardstop:
                 import calendars
+                # us 세션은 "어제(=market_date)가 미국 휴장일이었는지"가 아니라
+                # "오늘(today_kst) 한국 증시가 열리는지"로 건너뛸지 판단한다.
+                # 예전엔 어제 기준으로 봤는데, 주말 직후 월요일은 구조상 어제가
+                # 항상 휴장일이라 "장전 리포트"(휴장 다음 첫 개장일 프리뷰,
+                # briefing.py의 is_gap 분기 참고)까지 갈 필요도 없이 매주 조기
+                # 스킵돼버리는 문제가 있었다(2026-08-10 실사고). 오늘 한국 증시가
+                # 열리는 날이면 원문이 늦게라도 올라올 수 있으니 계속 대기하고,
+                # 오늘도 한국 증시 휴장(연휴 등)이면 그때만 건너뛴다 — kr 세션은
+                # 원래도 today_kst 기준이라 이 변경의 영향을 받지 않는다.
                 market_date = today_kst if session == "kr" else today_kst - datetime.timedelta(days=1)
-                is_holiday = (calendars.is_kr_market_holiday(market_date) if session == "kr"
-                              else calendars.is_us_market_holiday(market_date))
+                if session == "kr":
+                    is_holiday = calendars.is_kr_market_holiday(market_date)
+                else:
+                    is_holiday = calendars.is_kr_market_holiday(today_kst)
                 if is_holiday:
                     print(f"[{session}] 건너뜀 — {market_date} 휴장일(주말/공휴일)이라 소스도 없음, 발송 생략")
                     if not dry_run:
