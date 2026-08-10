@@ -1,6 +1,8 @@
 .env
 __pycache__/
 *.pyc
+.venv/
+.DS_Store
 out/*.html
 out/*.pdf
 !out/.gitkeep
