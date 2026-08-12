@@ -1,5 +1,12 @@
 [
   {
+    "session": "us",
+    "date": "2026-08-11",
+    "theme": "coinbase",
+    "path": "reports/us_coinbase_20260811.html",
+    "generated_at": "2026-08-12T09:34:57+09:00"
+  },
+  {
     "session": "kr",
     "date": "2026-08-11",
     "theme": "coinbase",
