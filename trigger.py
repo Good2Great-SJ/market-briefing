@@ -227,6 +227,23 @@ def check_and_run(now_sgt=None, dry_run=False):
         # 체크윈도우 시각대에는 "오늘의 KST 캘린더 날짜"가 곧 두 세션 모두의 기대 날짜와 같다.
         # (us: 미국장 마감일+1일=오늘, kr: 한국장 마감일=오늘)
         today_kst = now_sgt.astimezone(KST).date()
+
+        if session == "kr":
+            import calendars
+            # kr 세션은 오늘 한국 증시가 실제로 열렸어야 '마감 브리핑'이 의미가
+            # 있다. 그런데 아래 소스 매칭(_find_matching)은 날짜+시간대만 보고
+            # 판정해서, 태그 없는 소스(버터대디)가 휴장일에 올린 무관한 글(예:
+            # 일요일 주간 정리)이 그날 저녁 시간대에 올라오면 "오늘 kr 콘텐츠
+            # 있음"으로 오판해 휴장일에도 발행·발송돼버린다(2026-08-16 실사고 —
+            # 일요일에 금요일 마감 데이터로 리포트가 재발행·재발송됨). 그래서
+            # 소스 매칭 여부와 무관하게, 오늘이 애초에 휴장일이면 여기서 바로
+            # 건너뛴다.
+            if calendars.is_kr_market_holiday(today_kst):
+                print(f"[kr] 건너뜀 — {today_kst} 한국 증시 휴장일, 소스 매칭 확인 없이 스킵")
+                if not dry_run:
+                    _mark_done(session, date_str, "holiday_skip")
+                continue
+
         src = sources.get_sources_for_label_date(today_kst, session)
         has_source = sources.has_any(src)
         is_hardstop = t >= hardstop
@@ -288,6 +305,15 @@ def check_and_run(now_sgt=None, dry_run=False):
                 continue
             _, fn, pdf, report_url, viewer_url = result["outputs"][0]
             fired.append((session, reason, fn))
+            if session == "us":
+                # 2026-08-16: 비용 절감을 위해 미국장 세션은 리포트/사이트는
+                # 계속 생성하되 이메일은 발송하지 않기로 함(사용자 결정) — 국내
+                # 증시에만 집중. email_sent를 함께 마킹해 다음 체크에서 "이메일
+                # 기록 없음" 경고가 반복해서 뜨지 않게 한다.
+                print(f"[{session}] 이메일 발송 생략 — 미국장 세션은 이메일 미발송 정책")
+                if not dry_run:
+                    _mark_email_sent(session, date_str)
+                continue
             if _already_published_upstream(session, date_str):
                 # 이 실행이 빌드하는 동안 다른(거의 동시에 시작된) 트리거 실행이
                 # 먼저 커밋·발송을 끝냈다 — 같은 리포트를 또 보내지 않는다.
