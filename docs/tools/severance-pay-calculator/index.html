@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow">
+  <title>퇴직금 직접 계산기 | doleman</title>
+  <style>
+    :root{--navy:#102d4f;--navy2:#071c34;--teal:#0f8f8b;--mint:#dff4f1;--gold:#fff0bd;--red:#ffe3e3;--ink:#172334;--muted:#637083;--line:#dbe4ea;--bg:#f4f7f9;--white:#fff}
+    *{box-sizing:border-box}
+    html{background:transparent;color:var(--ink);font-family:Pretendard,"Noto Sans KR","Apple SD Gothic Neo",system-ui,sans-serif}
+    body{margin:0;padding:12px;background:transparent}
+    button,input{font:inherit}
+    .shell{max-width:820px;margin:auto;border:1px solid var(--line);border-radius:24px;background:var(--white);box-shadow:0 18px 50px rgba(16,45,79,.12);overflow:hidden}
+    .hero{padding:28px;background:linear-gradient(135deg,var(--navy2),var(--navy));color:#fff}
+    .eyebrow{font-size:13px;font-weight:800;letter-spacing:.04em;color:#9de2da}
+    h1{font-size:27px;line-height:1.32;margin:8px 0 10px}
+    .hero p{margin:0;color:#dce7f0;font-size:14px;line-height:1.7}
+    .privacy{display:inline-flex;align-items:center;gap:7px;margin-top:14px;padding:8px 11px;border:1px solid rgba(255,255,255,.22);border-radius:999px;font-size:12px;color:#fff}
+    .content{padding:22px}
+    .notice{padding:14px 16px;border-radius:14px;background:var(--gold);font-size:13px;line-height:1.7}
+    .section{margin-top:22px}
+    .section-title{display:flex;align-items:center;gap:9px;margin:0 0 13px;font-size:18px;color:var(--navy)}
+    .num{display:grid;place-items:center;width:27px;height:27px;border-radius:9px;background:var(--navy);color:#fff;font-size:13px}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+    .field{min-width:0}
+    .field.full{grid-column:1/-1}
+    label{display:block;margin:0 0 7px;font-size:13px;font-weight:750;color:#35455a}
+    input{width:100%;height:48px;border:1px solid #cdd9e1;border-radius:12px;padding:0 13px;background:#fff;color:var(--ink);outline:none}
+    input:focus{border-color:var(--teal);box-shadow:0 0 0 3px rgba(15,143,139,.13)}
+    .money{position:relative}
+    .money input{padding-right:34px;text-align:right;font-variant-numeric:tabular-nums}
+    .unit{position:absolute;right:13px;top:42px;color:var(--muted);font-size:13px;pointer-events:none}
+    .hint{display:block;margin-top:6px;font-size:11.5px;line-height:1.55;color:var(--muted)}
+    details{margin-top:15px;border:1px solid var(--line);border-radius:14px;background:#fbfcfd}
+    summary{cursor:pointer;padding:15px;font-size:14px;font-weight:800;color:var(--navy);list-style:none}
+    summary::-webkit-details-marker{display:none}
+    summary:after{content:'＋';float:right;color:var(--teal)}
+    details[open] summary:after{content:'－'}
+    .details-body{padding:0 15px 15px}
+    .actions{display:grid;grid-template-columns:1fr 2fr;gap:10px;margin-top:22px}
+    button{height:52px;border-radius:14px;border:0;cursor:pointer;font-weight:850}
+    .sample{background:#edf2f5;color:var(--navy)}
+    .calculate{background:linear-gradient(135deg,var(--teal),#06726f);color:#fff;box-shadow:0 10px 24px rgba(15,143,139,.22)}
+    .error{display:none;margin-top:13px;padding:12px 14px;border-radius:12px;background:var(--red);color:#7d2525;font-size:13px;line-height:1.6}
+    .result{display:none;margin-top:24px;border-radius:20px;background:linear-gradient(145deg,#0b213c,#123b61);color:#fff;padding:22px}
+    .result.show{display:block}
+    .result-label{font-size:13px;color:#a9dcd7}
+    .result-main{margin:6px 0 2px;font-size:34px;font-weight:900;letter-spacing:-.035em;font-variant-numeric:tabular-nums}
+    .result-sub{font-size:12px;color:#c5d5e3;line-height:1.65}
+    .status{margin-top:14px;padding:11px 13px;border-radius:12px;background:rgba(255,255,255,.1);font-size:13px;line-height:1.6}
+    .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:16px}
+    .card{padding:12px;border-radius:13px;background:rgba(255,255,255,.08)}
+    .card span{display:block;color:#bcd0df;font-size:11px;margin-bottom:5px}
+    .card strong{font-size:14px;font-variant-numeric:tabular-nums}
+    .formula{margin-top:14px;padding:13px;border:1px solid rgba(255,255,255,.15);border-radius:13px;font-size:12px;line-height:1.75;color:#e7eef4;word-break:keep-all}
+    .breakdown{margin-top:20px;border:1px solid var(--line);border-radius:16px;padding:16px;background:#fff}
+    .breakdown h2{font-size:16px;margin:0 0 10px;color:var(--navy)}
+    .row{display:flex;justify-content:space-between;gap:16px;padding:9px 0;border-bottom:1px dashed var(--line);font-size:13px;line-height:1.55}
+    .row:last-child{border-bottom:0}
+    .row span{color:var(--muted)}
+    .row strong{text-align:right;font-variant-numeric:tabular-nums}
+    .caution{margin-top:18px;padding:14px 16px;border-radius:14px;background:var(--mint);font-size:12px;line-height:1.75;color:#24474c}
+    .foot{padding:0 22px 24px;color:var(--muted);font-size:11.5px;line-height:1.7}
+    @media(max-width:620px){body{padding:4px}.shell{border-radius:16px}.hero{padding:22px 18px}h1{font-size:23px}.content{padding:18px 14px}.grid{grid-template-columns:1fr}.field.full{grid-column:auto}.actions{grid-template-columns:1fr}.cards{grid-template-columns:1fr}.result-main{font-size:29px}.row{display:block}.row strong{display:block;margin-top:4px;text-align:left}}
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <div class="eyebrow">DOLEMAN INTERACTIVE GUIDE</div>
+      <h1>퇴직금 직접 계산기</h1>
+      <p>고용노동부 안내 산식에 따라 세전 예상액과 계산 과정을 함께 보여드립니다.</p>
+      <div class="privacy">🔒 입력값은 저장하거나 전송하지 않습니다</div>
+    </header>
+
+    <div class="content">
+      <div class="notice"><strong>퇴직일은 마지막 근무일의 다음 날</strong>을 입력하세요. 계산 결과는 예상액이며 회사 규정과 개별 임금 항목에 따라 달라질 수 있습니다.</div>
+
+      <section class="section">
+        <h2 class="section-title"><span class="num">1</span>근무기간</h2>
+        <div class="grid">
+          <div class="field"><label for="startDate">입사일</label><input id="startDate" type="date"></div>
+          <div class="field"><label for="retireDate">퇴직일</label><input id="retireDate" type="date"><span class="hint">마지막 근무일 다음 날</span></div>
+          <div class="field"><label for="weeklyHours">최근 4주 평균 주당 소정근로시간</label><input id="weeklyHours" inputmode="decimal" value="40"><span class="hint">15시간 미만이면 법정 퇴직급여 적용 대상에서 제외될 수 있습니다.</span></div>
+          <div class="field"><label for="serviceExcluded">계속근로기간 제외일수</label><input id="serviceExcluded" inputmode="numeric" value="0"><span class="hint">중간정산 이후 앞선 기간 등 실제 근속에서 제외할 날이 있을 때만 입력</span></div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-title"><span class="num">2</span>임금 입력</h2>
+        <div class="grid">
+          <div class="field full money"><label for="threeMonthPay">퇴직 전 3개월 임금총액</label><input id="threeMonthPay" inputmode="numeric" placeholder="예: 7,080,000"><span class="unit">원</span><span class="hint">기본급과 임금에 해당하는 수당의 세전 합계</span></div>
+          <div class="field money"><label for="annualBonus">연간 상여금 총액</label><input id="annualBonus" inputmode="numeric" value="0"><span class="unit">원</span><span class="hint">계산에는 3/12가 반영됩니다.</span></div>
+          <div class="field money"><label for="annualLeave">반영할 연차수당 총액</label><input id="annualLeave" inputmode="numeric" value="0"><span class="unit">원</span><span class="hint">계산에는 3/12가 반영됩니다.</span></div>
+          <div class="field full money"><label for="ordinaryDaily">1일 통상임금</label><input id="ordinaryDaily" inputmode="numeric" value="0"><span class="unit">원</span><span class="hint">모르면 0원으로 두세요. 평균임금보다 높을 때 통상임금을 적용합니다.</span></div>
+        </div>
+
+        <details>
+          <summary>육아휴직 등 평균임금 제외기간 반영</summary>
+          <div class="details-body grid">
+            <div class="field"><label for="averageExcludedDays">평균임금 산정 제외일수</label><input id="averageExcludedDays" inputmode="numeric" value="0"><span class="hint">퇴직 전 3개월 안에 포함된 제외기간의 달력 일수</span></div>
+            <div class="field money"><label for="excludedPay">제외기간 중 임금</label><input id="excludedPay" inputmode="numeric" value="0"><span class="unit">원</span><span class="hint">위 3개월 임금총액에 포함됐다면 함께 제외합니다.</span></div>
+          </div>
+        </details>
+      </section>
+
+      <div class="actions"><button class="sample" id="sampleBtn" type="button">공식 예제 입력</button><button class="calculate" id="calculateBtn" type="button">예상 퇴직금 계산하기</button></div>
+      <div class="error" id="errorBox" role="alert"></div>
+
+      <section class="result" id="result" aria-live="polite">
+        <div class="result-label">예상 세전 퇴직금</div>
+        <div class="result-main" id="severanceResult">0원</div>
+        <div class="result-sub">퇴직소득세와 회사별 추가 지급 기준은 포함하지 않은 예상 금액입니다.</div>
+        <div class="status" id="eligibilityStatus"></div>
+        <div class="cards">
+          <div class="card"><span>적용 1일 임금</span><strong id="appliedDaily">0원</strong></div>
+          <div class="card"><span>1일 평균임금</span><strong id="averageDaily">0원</strong></div>
+          <div class="card"><span>계속근로일수</span><strong id="serviceDays">0일</strong></div>
+        </div>
+        <div class="formula" id="formulaText"></div>
+      </section>
+
+      <section class="breakdown" id="breakdown" hidden>
+        <h2>계산 근거</h2>
+        <div class="row"><span>평균임금 산정기간</span><strong id="periodText">-</strong></div>
+        <div class="row"><span>평균임금 분모</span><strong id="denominatorText">-</strong></div>
+        <div class="row"><span>3개월 임금 반영액</span><strong id="payText">-</strong></div>
+        <div class="row"><span>상여금 가산액</span><strong id="bonusText">-</strong></div>
+        <div class="row"><span>연차수당 가산액</span><strong id="leaveText">-</strong></div>
+        <div class="row"><span>적용 기준</span><strong id="basisText">-</strong></div>
+      </section>
+
+      <div class="caution"><strong>꼭 확인하세요.</strong> 평균임금에 포함되는 임금 항목, 제외기간, 통상임금은 근로계약과 지급 성격에 따라 달라질 수 있습니다. 1년 미만·주 15시간 미만 경고가 표시되거나 휴직기간이 길다면 고용노동부 1350 또는 전문가에게 확인하세요.</div>
+    </div>
+    <footer class="foot">산식: 1일 평균임금(통상임금이 더 높으면 통상임금) × 30일 × 계속근로일수 ÷ 365. 고용노동부 공개 안내를 기준으로 만든 정보 제공용 도구입니다.</footer>
+  </main>
+
+  <script>
+    (() => {
+      const $ = id => document.getElementById(id);
+      const DAY = 86400000;
+      const moneyIds = ['threeMonthPay','annualBonus','annualLeave','ordinaryDaily','excludedPay'];
+      const parseMoney = value => Number(String(value || '').replace(/[^0-9.-]/g,'')) || 0;
+      const formatMoney = value => `${Math.round(value).toLocaleString('ko-KR')}원`;
+      const dateUTC = value => { const [y,m,d] = value.split('-').map(Number); return new Date(Date.UTC(y,m-1,d)); };
+      const iso = date => date.toISOString().slice(0,10);
+      const displayDate = date => `${date.getUTCFullYear()}.${date.getUTCMonth()+1}.${date.getUTCDate()}`;
+      const subtractMonths = (date, months) => {
+        const rawMonth = date.getUTCMonth() - months;
+        const year = date.getUTCFullYear() + Math.floor(rawMonth / 12);
+        const month = ((rawMonth % 12) + 12) % 12;
+        const last = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+        return new Date(Date.UTC(year, month, Math.min(date.getUTCDate(), last)));
+      };
+      const setError = message => { $('errorBox').textContent = message; $('errorBox').style.display = 'block'; $('result').classList.remove('show'); $('breakdown').hidden = true; };
+      const clearError = () => { $('errorBox').textContent = ''; $('errorBox').style.display = 'none'; };
+
+      moneyIds.forEach(id => {
+        $(id).addEventListener('focus', e => { e.target.value = parseMoney(e.target.value) || ''; });
+        $(id).addEventListener('blur', e => { const n = parseMoney(e.target.value); e.target.value = n ? n.toLocaleString('ko-KR') : '0'; });
+      });
+
+      $('sampleBtn').addEventListener('click', () => {
+        $('startDate').value = '2014-10-02';
+        $('retireDate').value = '2017-09-16';
+        $('weeklyHours').value = '40';
+        $('serviceExcluded').value = '0';
+        $('threeMonthPay').value = '7,080,000';
+        $('annualBonus').value = '4,000,000';
+        $('annualLeave').value = '300,000';
+        $('ordinaryDaily').value = '0';
+        $('averageExcludedDays').value = '0';
+        $('excludedPay').value = '0';
+        clearError();
+      });
+
+      $('calculateBtn').addEventListener('click', () => {
+        clearError();
+        if (!$('startDate').value || !$('retireDate').value) return setError('입사일과 퇴직일을 모두 입력해 주세요. 퇴직일은 마지막 근무일의 다음 날입니다.');
+        const start = dateUTC($('startDate').value);
+        const retire = dateUTC($('retireDate').value);
+        if (retire <= start) return setError('퇴직일은 입사일보다 뒤여야 합니다.');
+        const serviceExcluded = Math.max(0, Math.floor(parseMoney($('serviceExcluded').value)));
+        const rawServiceDays = Math.round((retire - start) / DAY);
+        const serviceDays = rawServiceDays - serviceExcluded;
+        if (serviceDays <= 0) return setError('계속근로기간 제외일수가 전체 재직일수보다 많습니다.');
+
+        const periodStart = subtractMonths(retire, 3);
+        const periodDays = Math.round((retire - periodStart) / DAY);
+        const averageExcludedDays = Math.max(0, Math.floor(parseMoney($('averageExcludedDays').value)));
+        const denominator = periodDays - averageExcludedDays;
+        if (denominator <= 0) return setError('평균임금 산정 제외일수가 3개월 전체 일수보다 많습니다. 장기 휴직 사례는 별도 산정 기준을 확인해 주세요.');
+
+        const threeMonthPay = parseMoney($('threeMonthPay').value);
+        const excludedPay = parseMoney($('excludedPay').value);
+        if (threeMonthPay <= 0) return setError('퇴직 전 3개월 임금총액을 입력해 주세요.');
+        if (excludedPay > threeMonthPay) return setError('제외기간 중 임금은 3개월 임금총액보다 클 수 없습니다.');
+        const includedPay = threeMonthPay - excludedPay;
+        const bonusAdd = parseMoney($('annualBonus').value) * 3 / 12;
+        const leaveAdd = parseMoney($('annualLeave').value) * 3 / 12;
+        const averageDaily = (includedPay + bonusAdd + leaveAdd) / denominator;
+        const ordinaryDaily = parseMoney($('ordinaryDaily').value);
+        const appliedDaily = Math.max(averageDaily, ordinaryDaily);
+        const severance = appliedDaily * 30 * serviceDays / 365;
+        const weeklyHours = Number($('weeklyHours').value) || 0;
+        const eligibleDuration = serviceDays >= 365;
+        const eligibleHours = weeklyHours >= 15;
+
+        $('severanceResult').textContent = formatMoney(severance);
+        $('appliedDaily').textContent = formatMoney(appliedDaily);
+        $('averageDaily').textContent = formatMoney(averageDaily);
+        $('serviceDays').textContent = `${serviceDays.toLocaleString('ko-KR')}일`;
+        const basis = ordinaryDaily > averageDaily ? '통상임금이 더 높아 통상임금을 적용했습니다.' : '평균임금을 적용했습니다.';
+        $('basisText').textContent = basis;
+        $('formulaText').textContent = `${Math.round(appliedDaily).toLocaleString('ko-KR')}원 × 30일 × ${serviceDays.toLocaleString('ko-KR')}일 ÷ 365 = ${Math.round(severance).toLocaleString('ko-KR')}원`;
+        $('periodText').textContent = `${displayDate(periodStart)} ~ ${displayDate(new Date(retire.getTime()-DAY))}`;
+        $('denominatorText').textContent = `${periodDays}일 - 제외 ${averageExcludedDays}일 = ${denominator}일`;
+        $('payText').textContent = `${formatMoney(threeMonthPay)} - 제외 ${formatMoney(excludedPay)} = ${formatMoney(includedPay)}`;
+        $('bonusText').textContent = `${formatMoney(parseMoney($('annualBonus').value))} × 3/12 = ${formatMoney(bonusAdd)}`;
+        $('leaveText').textContent = `${formatMoney(parseMoney($('annualLeave').value))} × 3/12 = ${formatMoney(leaveAdd)}`;
+
+        if (eligibleDuration && eligibleHours) {
+          $('eligibilityStatus').innerHTML = `✅ 입력 기준으로 <strong>1년 이상·주 15시간 이상</strong> 조건을 충족합니다. ${basis}`;
+        } else {
+          const reasons = [];
+          if (!eligibleDuration) reasons.push('계속근로기간 1년 미만');
+          if (!eligibleHours) reasons.push('주 평균 소정근로시간 15시간 미만');
+          $('eligibilityStatus').innerHTML = `⚠️ <strong>${reasons.join(' · ')}</strong>으로 법정 퇴직급여 대상에서 제외될 수 있습니다. 고용노동부에 개별 확인하세요.`;
+        }
+        $('result').classList.add('show');
+        $('breakdown').hidden = false;
+        $('result').scrollIntoView({behavior:'smooth',block:'start'});
+      });
+
+      const today = new Date();
+      const retireDefault = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+      const startDefault = new Date(Date.UTC(today.getFullYear()-2, today.getMonth(), today.getDate()));
+      $('retireDate').value = iso(retireDefault);
+      $('startDate').value = iso(startDefault);
+    })();
+  </script>
+</body>
+</html>
