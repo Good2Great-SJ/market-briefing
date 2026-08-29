@@ -33,6 +33,11 @@ WINDOWS = {
     "kr": (datetime.time(17, 0), datetime.time(18, 0)),
 }
 
+# 2026-08-16: 이메일 발송 기능 전체 임시 중단(사용자 요청) — 리포트/사이트 생성은
+# 그대로 진행하고 이메일만 안 보낸다. 다시 켜려면 True로. (kr 오매칭 발송 사고,
+# us 이메일 비용 문제 등으로 안정화될 때까지 잠정 중단)
+EMAIL_ENABLED = False
+
 
 def _marker_path(session, date_str):
     return os.path.join(MARKER_DIR, f"{session}_{date_str}.done")
@@ -305,11 +310,18 @@ def check_and_run(now_sgt=None, dry_run=False):
                 continue
             _, fn, pdf, report_url, viewer_url = result["outputs"][0]
             fired.append((session, reason, fn))
+            if not EMAIL_ENABLED:
+                # 2026-08-16: 이메일 발송 기능 전체 임시 중단(사용자 요청). 리포트/
+                # 사이트는 정상 생성하고 email_sent만 함께 마킹해 다음 체크에서
+                # "이메일 기록 없음" 경고가 반복해서 뜨지 않게 한다.
+                print(f"[{session}] 이메일 발송 생략 — 이메일 발송 기능 전체 중단 중(EMAIL_ENABLED=False)")
+                if not dry_run:
+                    _mark_email_sent(session, date_str)
+                continue
             if session == "us":
-                # 2026-08-16: 비용 절감을 위해 미국장 세션은 리포트/사이트는
-                # 계속 생성하되 이메일은 발송하지 않기로 함(사용자 결정) — 국내
-                # 증시에만 집중. email_sent를 함께 마킹해 다음 체크에서 "이메일
-                # 기록 없음" 경고가 반복해서 뜨지 않게 한다.
+                # 2026-08-16: 비용 절감을 위해 미국장 세션은 EMAIL_ENABLED가 다시
+                # True가 되더라도 이메일은 계속 미발송(사용자 결정) — 국내 증시에만
+                # 집중. email_sent를 함께 마킹해 "이메일 기록 없음" 경고를 막는다.
                 print(f"[{session}] 이메일 발송 생략 — 미국장 세션은 이메일 미발송 정책")
                 if not dry_run:
                     _mark_email_sent(session, date_str)
