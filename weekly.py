@@ -276,6 +276,14 @@ def run(now_sgt=None, dry_run=False):
     with open(_marker_path(week_id), "w", encoding="utf-8") as f:
         json.dump({"at": now_sgt.isoformat()}, f, ensure_ascii=False)
 
+    # 2026-09-05: trigger.py의 EMAIL_ENABLED(이메일 발송 기능 전체 임시 중단)를
+    # weekly.py는 별도 스크립트라 체크하지 않아, kr/us 세션은 막아놨는데 주간
+    # 다이제스트만 계속 발송되는 문제가 있었다 — 같은 플래그를 공유해서 막는다.
+    import trigger
+    if not trigger.EMAIL_ENABLED:
+        print(f"[weekly] 이메일 발송 생략 — 이메일 발송 기능 전체 중단 중(EMAIL_ENABLED=False)")
+        return dict(subject=subject, body=body, html=html, skipped="email_disabled")
+
     import delivery
     res = delivery.send_email(subject, body, [], html_body=html)
     print("  → 이메일 발송 완료:", res)

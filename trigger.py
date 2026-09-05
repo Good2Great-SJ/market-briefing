@@ -160,6 +160,11 @@ def retry_unsent_emails(now_sgt=None):
     성공하면 마커를 남기고 페이로드를 지운다. EMAIL_RETRY_HOURS를 넘긴
     페이로드는 낡은 내용이므로 재발송 없이 폐기한다."""
     now_sgt = now_sgt or datetime.datetime.now(SGT)
+    if not EMAIL_ENABLED:
+        # 2026-09-05: check_and_run()의 EMAIL_ENABLED 차단을 이 별도 재시도
+        # 경로는 체크하지 않아서, kr/us 세션은 막아놨는데 남아있는 실패 페이로드가
+        # 있으면 이 경로로 계속 새어나갈 수 있었다 — 여기도 동일하게 막는다.
+        return
     if not os.path.isdir(MARKER_DIR):
         return
     import delivery
